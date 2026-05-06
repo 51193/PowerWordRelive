@@ -47,13 +47,13 @@ public class ProcessManager
         }
     }
 
-    public async Task WaitAllAsync()
+    public async Task WaitAllAsync(CancellationToken ct = default)
     {
         var tasks = _spawned.Select(async spawned =>
         {
             try
             {
-                await spawned.SystemProcess.WaitForExitAsync();
+                await spawned.SystemProcess.WaitForExitAsync(ct);
 
                 var exitCode = spawned.SystemProcess.ExitCode;
                 var info = $"Child process {spawned.SystemProcess.StartInfo.Arguments} exited with code {exitCode}";
@@ -62,6 +62,7 @@ public class ProcessManager
                 else
                     LogRedirector.Warn("LegendLore.Host", info);
             }
+            catch (OperationCanceledException) { }
             catch (Exception ex)
             {
                 LogRedirector.Error("LegendLore.Host", "Error while waiting for process exit",
@@ -72,6 +73,19 @@ public class ProcessManager
         await Task.WhenAll(tasks);
 
         LogRedirector.Info("LegendLore.Host", "All child processes exited, shutting down");
+    }
+
+    public void KillAll()
+    {
+        foreach (var spawned in _spawned)
+        {
+            try
+            {
+                if (!spawned.SystemProcess.HasExited)
+                    spawned.SystemProcess.Kill(true);
+            }
+            catch { }
+        }
     }
 
     private List<ProcessDefinition> GetProcessDefinitions()

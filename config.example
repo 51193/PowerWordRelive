@@ -1,0 +1,19 @@
+# LegendLore Configuration
+# Format: domain.exact_config_key: value
+
+# Process definitions (project name -> process key)
+processes.audio_capture: LegendLore.AudioCapture
+
+# Which domain configs to pass to each process
+process_config.audio_capture.domains: audio_capture,general
+
+# General — work_root MUST be an absolute path
+general.work_root: /absolute/path/to/work/root
+
+# Audio Capture
+audio_capture.output_dir: ./segments
+audio_capture.sample_rate: 16000
+audio_capture.silence_timeout_ms: 300
+audio_capture.max_segment_sec: 120
+audio_capture.no_speech_timeout_sec: 30
+audio_capture.min_speech_ms: 500

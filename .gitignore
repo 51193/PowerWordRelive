@@ -1,8 +1,10 @@
 bin/
 obj/
 out/
+scripts/venv/
 /packages/
 riderModule.iml
 /_ReSharper.Caches/
 
 .idea/
+/config

@@ -9,4 +9,23 @@ var config = ConfigParser.Parse(configPath);
 
 var manager = new ProcessManager(config);
 await manager.LaunchAllAsync();
-await manager.WaitAllAsync();
+
+var cts = new CancellationTokenSource();
+
+Console.CancelKeyPress += (_, e) =>
+{
+    e.Cancel = true;
+    LogRedirector.Info("LegendLore.Host", "Shutting down...");
+    cts.Cancel();
+    manager.KillAll();
+};
+
+System.Runtime.InteropServices.PosixSignalRegistration.Create(
+    System.Runtime.InteropServices.PosixSignal.SIGTERM, _ =>
+    {
+        LogRedirector.Info("LegendLore.Host", "Shutting down...");
+        cts.Cancel();
+        manager.KillAll();
+    });
+
+await manager.WaitAllAsync(cts.Token);

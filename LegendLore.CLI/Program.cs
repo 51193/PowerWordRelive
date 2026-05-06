@@ -24,6 +24,13 @@ var psi = new ProcessStartInfo
 
 using var process = Process.Start(psi)!;
 
+Console.CancelKeyPress += (_, e) =>
+{
+    e.Cancel = true;
+    if (!process.HasExited)
+        process.Kill();
+};
+
 var stdoutTask = Task.Run(async () =>
 {
     string? line;
