@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using LegendLore.Infrastructure.Storage;
 
 namespace LegendLore.AudioCapture;
 
@@ -7,12 +8,16 @@ public class FfmpegWrapper
     private readonly string _pythonPath;
     private readonly string _monitor;
     private readonly int _sampleRate;
+    private readonly string _torchHome;
+    private readonly IFileSystem _fs;
 
-    public FfmpegWrapper(string pythonPath, int sampleRate = 16000)
+    public FfmpegWrapper(string pythonPath, string cacheRoot, IFileSystem fs, int sampleRate = 16000)
     {
         _pythonPath = pythonPath;
         _monitor = DetectMonitor();
         _sampleRate = sampleRate;
+        _torchHome = Path.Combine(cacheRoot, "torch");
+        _fs = fs;
     }
 
     public string Monitor => _monitor;
@@ -52,6 +57,9 @@ public class FfmpegWrapper
             UseShellExecute = false,
             CreateNoWindow = true
         };
+
+        pythonPsi.Environment["TORCH_HOME"] = _torchHome;
+        _fs.CreateDirectory(_torchHome);
 
         var ffmpegProcess = System.Diagnostics.Process.Start(ffmpegPsi)!;
         var pythonProcess = System.Diagnostics.Process.Start(pythonPsi)!;

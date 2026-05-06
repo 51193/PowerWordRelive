@@ -1,20 +1,28 @@
 using LegendLore.Infrastructure.Logging;
+using LegendLore.Infrastructure.Storage;
 
 namespace LegendLore.Host.Config;
 
-public static class ConfigParser
+public class ConfigParser
 {
-    public static Dictionary<string, Dictionary<string, string>> Parse(string filePath)
+    private readonly IFileSystem _fs;
+
+    public ConfigParser(IFileSystem fs)
+    {
+        _fs = fs;
+    }
+
+    public Dictionary<string, Dictionary<string, string>> Parse(string filePath)
     {
         var result = new Dictionary<string, Dictionary<string, string>>();
 
-        if (!File.Exists(filePath))
+        if (!_fs.FileExists(filePath))
         {
             LogRedirector.Error("LegendLore.Host", $"Config file not found: {filePath}");
             return result;
         }
 
-        foreach (var rawLine in File.ReadAllLines(filePath))
+        foreach (var rawLine in _fs.ReadAllLines(filePath))
         {
             var line = rawLine.Trim();
             if (string.IsNullOrEmpty(line) || line.StartsWith('#'))

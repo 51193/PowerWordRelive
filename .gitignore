@@ -1,7 +1,9 @@
 bin/
 obj/
 out/
-scripts/venv/
+scripts/vad_venv/
+scripts/speaker_split_venv/
+cache/
 /packages/
 riderModule.iml
 /_ReSharper.Caches/

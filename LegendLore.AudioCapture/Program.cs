@@ -1,6 +1,9 @@
 using LegendLore.AudioCapture;
 using LegendLore.Infrastructure.Configuration;
 using LegendLore.Infrastructure.Logging;
+using LegendLore.Infrastructure.Storage;
+
+var fs = new LocalFileSystem();
 
 var config = ChildConfigReader.ReadConfig();
 var audioConfig = config.GetValueOrDefault("audio_capture", new Dictionary<string, string>());
@@ -19,28 +22,30 @@ if (!string.IsNullOrEmpty(workRoot) && Path.IsPathRooted(workRoot))
 else if (!Path.IsPathRooted(outputDir))
     outputDir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, outputDir));
 
-Directory.CreateDirectory(outputDir);
+fs.CreateDirectory(outputDir);
 
-var pythonPath = Path.Combine(AppContext.BaseDirectory, "venv", "bin", "python3");
+var cacheRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "cache"));
+
+var pythonPath = Path.Combine(AppContext.BaseDirectory, "vad_venv", "bin", "python3");
 var pythonScriptPath = Path.Combine(AppContext.BaseDirectory, "vad_segmenter.py");
 
-if (!File.Exists(pythonPath))
+if (!fs.FileExists(pythonPath))
 {
     LogRedirector.Error("LegendLore.AudioCapture",
         $"Python not found: {pythonPath}");
     return;
 }
 
-if (!File.Exists(pythonScriptPath))
+if (!fs.FileExists(pythonScriptPath))
 {
     LogRedirector.Error("LegendLore.AudioCapture",
         $"Python VAD script not found: {pythonScriptPath}");
     return;
 }
 
-var handler = new LocalFileSegmentHandler();
+var handler = new LocalFileSegmentHandler(fs);
 var process = new RecordingProcess(
-    outputDir, pythonScriptPath, pythonPath, handler,
+    outputDir, pythonScriptPath, pythonPath, cacheRoot, fs, handler,
     silenceMs, maxSec, noSpeechTimeoutSec, minSpeechMs);
 
 using var cts = new CancellationTokenSource();

@@ -12,11 +12,11 @@
     </ItemGroup>
 
     <Target Name="CopyPythonScript" AfterTargets="Build">
-        <Copy SourceFiles="$(RepoRoot)scripts\vad_segmenter.py" DestinationFolder="$(OutputPath)" />
+        <Copy SourceFiles="$(RepoRoot)scripts\speaker_diarize.py" DestinationFolder="$(OutputPath)" />
     </Target>
 
-    <Target Name="CopyVenv" AfterTargets="Build" Condition="Exists('$(RepoRoot)scripts/vad_venv')">
-        <Exec Command="cp -r &quot;$(RepoRoot)scripts/vad_venv&quot; &quot;$(OutputPath)&quot;" />
+    <Target Name="CopyVenv" AfterTargets="Build" Condition="Exists('$(RepoRoot)scripts/speaker_split_venv')">
+        <Exec Command="cp -r &quot;$(RepoRoot)scripts/speaker_split_venv&quot; &quot;$(OutputPath)&quot;" />
     </Target>
 
 </Project>

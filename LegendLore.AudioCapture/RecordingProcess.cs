@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using LegendLore.Infrastructure.Logging;
+using LegendLore.Infrastructure.Storage;
 
 namespace LegendLore.AudioCapture;
 
@@ -9,6 +10,7 @@ public class RecordingProcess
     private readonly string _pythonScriptPath;
     private readonly ISegmentHandler _segmentHandler;
     private readonly FfmpegWrapper _ffmpeg;
+    private readonly IFileSystem _fs;
     private readonly int _silenceTimeoutMs;
     private readonly int _maxSegmentSec;
     private readonly int _noSpeechTimeoutSec;
@@ -18,6 +20,8 @@ public class RecordingProcess
         string outputDir,
         string pythonScriptPath,
         string pythonPath,
+        string cacheRoot,
+        IFileSystem fs,
         ISegmentHandler segmentHandler,
         int silenceTimeoutMs = 800,
         int maxSegmentSec = 120,
@@ -31,7 +35,8 @@ public class RecordingProcess
         _maxSegmentSec = maxSegmentSec;
         _noSpeechTimeoutSec = noSpeechTimeoutSec;
         _minSpeechMs = minSpeechMs;
-        _ffmpeg = new FfmpegWrapper(pythonPath, 16000);
+        _fs = fs;
+        _ffmpeg = new FfmpegWrapper(pythonPath, cacheRoot, fs, 16000);
     }
 
     public async Task RunAsync(CancellationToken ct)
@@ -61,7 +66,7 @@ public class RecordingProcess
                 if (line.StartsWith("SEGMENT_COMPLETE "))
                 {
                     var tempFile = line["SEGMENT_COMPLETE ".Length..];
-                    if (File.Exists(tempFile))
+                    if (_fs.FileExists(tempFile))
                     {
                         var info = new FileInfo(tempFile);
                         LogRedirector.Info("LegendLore.AudioCapture", "Segment completed",
@@ -157,12 +162,12 @@ public class RecordingProcess
         return await readTask;
     }
 
-    private static void TryDelete(string path)
+    private void TryDelete(string path)
     {
         try
         {
-            if (File.Exists(path))
-                File.Delete(path);
+            if (_fs.FileExists(path))
+                _fs.DeleteFile(path);
         }
         catch { }
     }

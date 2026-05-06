@@ -3,9 +3,11 @@
 
 # Process definitions (project name -> process key)
 processes.audio_capture: LegendLore.AudioCapture
+processes.speaker_split: LegendLore.SpeakerSplit
 
 # Which domain configs to pass to each process
 process_config.audio_capture.domains: audio_capture,general
+process_config.speaker_split.domains: speaker_split,general,huggingface
 
 # General — work_root MUST be an absolute path
 general.work_root: /absolute/path/to/work/root
@@ -17,3 +19,14 @@ audio_capture.silence_timeout_ms: 300
 audio_capture.max_segment_sec: 120
 audio_capture.no_speech_timeout_sec: 30
 audio_capture.min_speech_ms: 500
+
+# Speaker Split
+speaker_split.input_dir: ./segments
+speaker_split.output_dir: ./speaker_segments
+speaker_split.embeddings_dir: ./speaker_embeddings
+speaker_split.device: cpu
+speaker_split.poll_interval_sec: 1
+speaker_split.match_threshold: 0.55
+
+# HuggingFace
+huggingface.token: hf_your_huggingface_token_here

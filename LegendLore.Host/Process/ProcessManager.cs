@@ -1,16 +1,19 @@
 using LegendLore.Host.Models;
 using LegendLore.Infrastructure.Logging;
+using LegendLore.Infrastructure.Storage;
 
 namespace LegendLore.Host.Process;
 
 public class ProcessManager
 {
     private readonly Dictionary<string, Dictionary<string, string>> _config;
+    private readonly IFileSystem _fs;
     private readonly List<ProcessSpawner.SpawnedProcess> _spawned = new();
 
-    public ProcessManager(Dictionary<string, Dictionary<string, string>> config)
+    public ProcessManager(Dictionary<string, Dictionary<string, string>> config, IFileSystem fs)
     {
         _config = config;
+        _fs = fs;
     }
 
     public async Task LaunchAllAsync()
@@ -27,7 +30,7 @@ public class ProcessManager
             var subConfig = BuildSubConfig(def.Domains);
             var dllPath = ProcessResolver.ResolveDllPath(def.ProjectName);
 
-            if (!File.Exists(dllPath))
+            if (!_fs.FileExists(dllPath))
             {
                 LogRedirector.Error("LegendLore.Host", "Child process binary not found",
                     new { process = def.Name, path = dllPath });

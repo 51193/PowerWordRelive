@@ -1,12 +1,15 @@
 ﻿using System.Diagnostics;
 using System.Text.Json;
 using LegendLore.Infrastructure.Models;
+using LegendLore.Infrastructure.Storage;
+
+var fs = new LocalFileSystem();
 
 var baseDir = AppContext.BaseDirectory;
 var hostDir = Path.GetFullPath(Path.Combine(baseDir, "..", "LegendLore.Host"));
 var hostDll = Path.Combine(hostDir, "LegendLore.Host.dll");
 
-if (!File.Exists(hostDll))
+if (!fs.FileExists(hostDll))
 {
     Console.Error.WriteLine($"Host binary not found: {hostDll}");
     return 1;
