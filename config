@@ -1,0 +1,19 @@
+# LegendLore Configuration
+# Format: domain.exact_config_key: value
+
+# Process definitions (project name -> process key)
+processes.language_parser: LegendLore.LanguageParser
+processes.code_generator: LegendLore.CodeGenerator
+
+# Which domain configs to pass to each process
+process_config.language_parser.domains: server,database
+process_config.code_generator.domains: database
+
+# Server configuration
+server.port: 8080
+server.host: localhost
+
+# Database configuration
+database.host: localhost
+database.port: 5432
+database.name: legendlore
