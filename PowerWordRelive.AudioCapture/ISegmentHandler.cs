@@ -1,6 +1,6 @@
 namespace PowerWordRelive.AudioCapture;
 
-public interface ISegmentHandler
+internal interface ISegmentHandler
 {
     Task HandleSegmentAsync(string tempFilePath, DateTime startTime, CancellationToken ct);
 }

@@ -1,42 +1,18 @@
 using System.Diagnostics;
 using PowerWordRelive.Infrastructure.Logging;
-using PowerWordRelive.Infrastructure.Storage;
 
 namespace PowerWordRelive.AudioCapture;
 
-public class RecordingProcess
+internal class RecordingProcess
 {
     private readonly FfmpegWrapper _ffmpeg;
-    private readonly IFileSystem _fs;
-    private readonly int _maxSegmentSec;
-    private readonly int _minSpeechMs;
-    private readonly int _noSpeechTimeoutSec;
-    private readonly string _outputDir;
-    private readonly string _pythonScriptPath;
-    private readonly ISegmentHandler _segmentHandler;
-    private readonly int _silenceTimeoutMs;
+    private readonly RecordingOptions _opt;
 
-    public RecordingProcess(
-        string outputDir,
-        string pythonScriptPath,
-        string pythonPath,
-        string cacheRoot,
-        IFileSystem fs,
-        ISegmentHandler segmentHandler,
-        int silenceTimeoutMs = 800,
-        int maxSegmentSec = 120,
-        int noSpeechTimeoutSec = 30,
-        int minSpeechMs = 500)
+    public RecordingProcess(RecordingOptions options)
     {
-        _outputDir = outputDir;
-        _pythonScriptPath = pythonScriptPath;
-        _segmentHandler = segmentHandler;
-        _silenceTimeoutMs = silenceTimeoutMs;
-        _maxSegmentSec = maxSegmentSec;
-        _noSpeechTimeoutSec = noSpeechTimeoutSec;
-        _minSpeechMs = minSpeechMs;
-        _fs = fs;
-        _ffmpeg = new FfmpegWrapper(pythonPath, cacheRoot, fs);
+        _opt = options;
+        _ffmpeg = new FfmpegWrapper(
+            _opt.PythonPath, _opt.CacheRoot, _opt.Fs);
     }
 
     public async Task RunAsync(CancellationToken ct)
@@ -44,16 +20,17 @@ public class RecordingProcess
         LogRedirector.Info("PowerWordRelive.AudioCapture", "Recording process started",
             new
             {
-                monitor = _ffmpeg.Monitor, outputDir = _outputDir,
-                silenceTimeoutMs = _silenceTimeoutMs,
-                maxSegmentSec = _maxSegmentSec,
-                noSpeechTimeoutSec = _noSpeechTimeoutSec,
-                minSpeechMs = _minSpeechMs
+                monitor = _ffmpeg.Monitor, outputDir = _opt.OutputDir,
+                silenceTimeoutMs = _opt.SilenceTimeoutMs,
+                maxSegmentSec = _opt.MaxSegmentSec,
+                noSpeechTimeoutSec = _opt.NoSpeechTimeoutSec,
+                minSpeechMs = _opt.MinSpeechMs
             });
 
         var (ffmpegProcess, pythonProcess) = _ffmpeg.Launch(
-            _pythonScriptPath, _outputDir,
-            _silenceTimeoutMs, _maxSegmentSec, _noSpeechTimeoutSec, _minSpeechMs);
+            _opt.PythonScriptPath, _opt.OutputDir,
+            _opt.SilenceTimeoutMs, _opt.MaxSegmentSec,
+            _opt.NoSpeechTimeoutSec, _opt.MinSpeechMs);
 
         var stderrTask = ReadStderrAsync(ffmpegProcess, pythonProcess, ct);
 
@@ -65,12 +42,12 @@ public class RecordingProcess
                 if (line.StartsWith("SEGMENT_COMPLETE "))
                 {
                     var tempFile = line["SEGMENT_COMPLETE ".Length..];
-                    if (_fs.FileExists(tempFile))
+                    if (_opt.Fs.FileExists(tempFile))
                     {
                         var info = new FileInfo(tempFile);
                         LogRedirector.Info("PowerWordRelive.AudioCapture", "Segment completed",
                             new { file = tempFile, sizeBytes = info.Length });
-                        await _segmentHandler.HandleSegmentAsync(tempFile, DateTime.UtcNow, ct);
+                        await _opt.SegmentHandler.HandleSegmentAsync(tempFile, DateTime.UtcNow, ct);
                     }
                 }
                 else if (line.StartsWith("SEGMENT_TOO_SHORT "))
@@ -168,8 +145,8 @@ public class RecordingProcess
     {
         try
         {
-            if (_fs.FileExists(path))
-                _fs.DeleteFile(path);
+            if (_opt.Fs.FileExists(path))
+                _opt.Fs.DeleteFile(path);
         }
         catch
         {

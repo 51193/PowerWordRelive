@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using PowerWordRelive.Infrastructure.Models;
 using PowerWordRelive.Infrastructure.Storage;
@@ -33,6 +34,12 @@ Console.CancelKeyPress += (_, e) =>
     if (!process.HasExited)
         process.Kill();
 };
+
+PosixSignalRegistration.Create(PosixSignal.SIGTERM, _ =>
+{
+    if (!process.HasExited)
+        process.Kill();
+});
 
 var stdoutTask = Task.Run(async () =>
 {

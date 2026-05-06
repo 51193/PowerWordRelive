@@ -4,7 +4,7 @@ using PowerWordRelive.Infrastructure.Models;
 
 namespace PowerWordRelive.Host.Process;
 
-public class LogMultiplexer
+internal class LogMultiplexer
 {
     private readonly string _processName;
 

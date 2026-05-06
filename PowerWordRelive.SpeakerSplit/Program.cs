@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using PowerWordRelive.Infrastructure.Configuration;
 using PowerWordRelive.Infrastructure.Logging;
 using PowerWordRelive.Infrastructure.Storage;
@@ -64,11 +65,11 @@ if (!fs.FileExists(pythonScriptPath))
 LogRedirector.Info("PowerWordRelive.SpeakerSplit", "SpeakerSplit starting",
     new { inputDir, outputDir, embeddingsDir, device, matchThreshold, pollIntervalSec });
 
-var process = new SpeakerSplitProcess(
+var process = new SpeakerSplitProcess(new SpeakerSplitOptions(
     inputDir, outputDir, embeddingsDir,
     pythonScriptPath, pythonPath, cacheRoot,
     hfToken, device, matchThreshold, ompNumThreads,
-    segBatchSize, embBatchSize, pollIntervalSec, fs);
+    segBatchSize, embBatchSize, pollIntervalSec, fs));
 
 using var cts = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) =>
@@ -77,6 +78,12 @@ Console.CancelKeyPress += (_, e) =>
     LogRedirector.Info("PowerWordRelive.SpeakerSplit", "Shutting down...");
     cts.Cancel();
 };
+
+PosixSignalRegistration.Create(PosixSignal.SIGTERM, _ =>
+{
+    LogRedirector.Info("PowerWordRelive.SpeakerSplit", "Shutting down...");
+    cts.Cancel();
+});
 
 try
 {

@@ -4,7 +4,7 @@ using PowerWordRelive.Infrastructure.Logging;
 
 namespace PowerWordRelive.Host.Process;
 
-public class ProcessSpawner
+internal class ProcessSpawner
 {
     public static SpawnedProcess Spawn(string processName, string dllPath,
         Dictionary<string, Dictionary<string, string>> config)

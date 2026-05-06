@@ -3,7 +3,7 @@ using PowerWordRelive.Infrastructure.Storage;
 
 namespace PowerWordRelive.AudioCapture;
 
-public class FfmpegWrapper
+internal class FfmpegWrapper
 {
     private readonly IFileSystem _fs;
     private readonly string _pythonPath;

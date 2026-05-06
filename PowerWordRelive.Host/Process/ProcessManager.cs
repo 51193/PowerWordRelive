@@ -4,7 +4,7 @@ using PowerWordRelive.Infrastructure.Storage;
 
 namespace PowerWordRelive.Host.Process;
 
-public class ProcessManager
+internal class ProcessManager
 {
     private readonly Dictionary<string, Dictionary<string, string>> _config;
     private readonly IFileSystem _fs;

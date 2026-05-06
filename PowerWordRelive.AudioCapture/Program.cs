@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using PowerWordRelive.AudioCapture;
 using PowerWordRelive.Infrastructure.Configuration;
 using PowerWordRelive.Infrastructure.Logging;
@@ -44,9 +45,10 @@ if (!fs.FileExists(pythonScriptPath))
 }
 
 var handler = new LocalFileSegmentHandler(fs);
-var process = new RecordingProcess(
+var options = new RecordingOptions(
     outputDir, pythonScriptPath, pythonPath, cacheRoot, fs, handler,
     silenceMs, maxSec, noSpeechTimeoutSec, minSpeechMs);
+var process = new RecordingProcess(options);
 
 using var cts = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) =>
@@ -55,5 +57,11 @@ Console.CancelKeyPress += (_, e) =>
     LogRedirector.Info("PowerWordRelive.AudioCapture", "Shutting down...");
     cts.Cancel();
 };
+
+PosixSignalRegistration.Create(PosixSignal.SIGTERM, _ =>
+{
+    LogRedirector.Info("PowerWordRelive.AudioCapture", "Shutting down...");
+    cts.Cancel();
+});
 
 await process.RunAsync(cts.Token);

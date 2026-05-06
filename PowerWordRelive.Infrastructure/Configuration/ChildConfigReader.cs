@@ -7,9 +7,10 @@ public static class ChildConfigReader
     public static Dictionary<string, Dictionary<string, string>> ReadConfig()
     {
         var stdin = Console.In.ReadToEnd();
-        if (string.IsNullOrWhiteSpace(stdin)) return new Dictionary<string, Dictionary<string, string>>();
+        if (string.IsNullOrWhiteSpace(stdin))
+            throw new InvalidOperationException("No configuration received from parent process via stdin");
 
         return JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, string>>>(stdin)
-               ?? new Dictionary<string, Dictionary<string, string>>();
+               ?? throw new InvalidOperationException("Failed to deserialize configuration from stdin");
     }
 }

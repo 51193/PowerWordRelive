@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace PowerWordRelive.Infrastructure.Timing;
 
-public static class TimingHelper
+public static class TimingParser
 {
     public static TimingResult? FromJson(JsonElement timingElement)
     {

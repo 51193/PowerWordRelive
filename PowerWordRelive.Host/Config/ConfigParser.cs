@@ -3,7 +3,7 @@ using PowerWordRelive.Infrastructure.Storage;
 
 namespace PowerWordRelive.Host.Config;
 
-public class ConfigParser
+internal class ConfigParser
 {
     private readonly IFileSystem _fs;
 
@@ -14,13 +14,10 @@ public class ConfigParser
 
     public Dictionary<string, Dictionary<string, string>> Parse(string filePath)
     {
-        var result = new Dictionary<string, Dictionary<string, string>>();
-
         if (!_fs.FileExists(filePath))
-        {
-            LogRedirector.Error("PowerWordRelive.Host", $"Config file not found: {filePath}");
-            return result;
-        }
+            throw new FileNotFoundException($"Config file not found: {filePath}");
+
+        var result = new Dictionary<string, Dictionary<string, string>>();
 
         foreach (var rawLine in _fs.ReadAllLines(filePath))
         {

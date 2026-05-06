@@ -1,6 +1,6 @@
 namespace PowerWordRelive.Host.Process;
 
-public static class ProcessResolver
+internal static class ProcessResolver
 {
     public static string ResolveDllPath(string projectName)
     {

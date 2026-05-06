@@ -2,7 +2,7 @@ using PowerWordRelive.Infrastructure.Storage;
 
 namespace PowerWordRelive.AudioCapture;
 
-public class LocalFileSegmentHandler : ISegmentHandler
+internal class LocalFileSegmentHandler : ISegmentHandler
 {
     private readonly IFileSystem _fs;
 

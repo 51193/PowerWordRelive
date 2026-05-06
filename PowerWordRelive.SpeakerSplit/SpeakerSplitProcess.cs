@@ -1,61 +1,19 @@
 using System.Diagnostics;
 using System.Text.Json;
 using PowerWordRelive.Infrastructure.Logging;
-using PowerWordRelive.Infrastructure.Storage;
 using PowerWordRelive.Infrastructure.Timing;
 
 namespace PowerWordRelive.SpeakerSplit;
 
-public class SpeakerSplitProcess
+internal class SpeakerSplitProcess
 {
     private const string ProcessingExtension = ".processing";
-    private readonly string _cacheRoot;
     private readonly CumulativeTimer _cumulativeTimer = new();
-    private readonly string _device;
-    private readonly int _embBatchSize;
-    private readonly string _embeddingsDir;
-    private readonly IFileSystem _fs;
-    private readonly string _hfToken;
+    private readonly SpeakerSplitOptions _opt;
 
-    private readonly string _inputDir;
-    private readonly float _matchThreshold;
-    private readonly int _ompNumThreads;
-    private readonly string _outputDir;
-    private readonly int _pollIntervalSec;
-    private readonly string _pythonPath;
-    private readonly string _pythonScriptPath;
-    private readonly int _segBatchSize;
-
-    public SpeakerSplitProcess(
-        string inputDir,
-        string outputDir,
-        string embeddingsDir,
-        string pythonScriptPath,
-        string pythonPath,
-        string cacheRoot,
-        string hfToken,
-        string device,
-        float matchThreshold,
-        int ompNumThreads,
-        int segBatchSize,
-        int embBatchSize,
-        int pollIntervalSec,
-        IFileSystem fs)
+    public SpeakerSplitProcess(SpeakerSplitOptions options)
     {
-        _inputDir = inputDir;
-        _outputDir = outputDir;
-        _embeddingsDir = embeddingsDir;
-        _pythonScriptPath = pythonScriptPath;
-        _pythonPath = pythonPath;
-        _cacheRoot = cacheRoot;
-        _hfToken = hfToken;
-        _device = device;
-        _matchThreshold = matchThreshold;
-        _ompNumThreads = ompNumThreads;
-        _segBatchSize = segBatchSize;
-        _embBatchSize = embBatchSize;
-        _pollIntervalSec = pollIntervalSec;
-        _fs = fs;
+        _opt = options;
     }
 
     public async Task RunAsync(CancellationToken ct)
@@ -65,16 +23,14 @@ public class SpeakerSplitProcess
         Process? pythonProc = null;
         StreamWriter? pythonStdin = null;
         StreamReader? pythonStdout = null;
-        StreamReader? pythonStderr = null;
 
         try
         {
             pythonProc = LaunchPython();
             pythonStdin = pythonProc.StandardInput;
             pythonStdout = pythonProc.StandardOutput;
-            pythonStderr = pythonProc.StandardError;
 
-            _ = ReadStderrAsync(pythonStderr);
+            _ = ReadStderrAsync(pythonProc.StandardError);
 
             while (!ct.IsCancellationRequested)
             {
@@ -90,7 +46,7 @@ public class SpeakerSplitProcess
 
                 try
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(_pollIntervalSec), ct);
+                    await Task.Delay(TimeSpan.FromSeconds(_opt.PollIntervalSec), ct);
                 }
                 catch (OperationCanceledException)
                 {
@@ -99,77 +55,89 @@ public class SpeakerSplitProcess
         }
         finally
         {
+            TeardownPython(pythonProc, pythonStdin);
+            LogSummary();
+        }
+    }
+
+    private void TeardownPython(Process? proc, StreamWriter? stdin)
+    {
+        try
+        {
+            stdin?.Close();
+        }
+        catch
+        {
+        }
+
+        if (proc is null || proc.HasExited)
+        {
+            proc?.Dispose();
+            return;
+        }
+
+        try
+        {
+            proc.WaitForExit(5000);
+        }
+        catch
+        {
+        }
+
+        if (!proc.HasExited)
+        {
             try
             {
-                pythonStdin?.Close();
+                proc.Kill(true);
             }
             catch
             {
             }
 
-            if (pythonProc is not null && !pythonProc.HasExited)
+            try
             {
-                try
-                {
-                    pythonProc.WaitForExit(5000);
-                }
-                catch
-                {
-                }
-
-                if (!pythonProc.HasExited)
-                {
-                    try
-                    {
-                        pythonProc.Kill(true);
-                    }
-                    catch
-                    {
-                    }
-
-                    try
-                    {
-                        pythonProc.WaitForExit(2000);
-                    }
-                    catch
-                    {
-                    }
-                }
+                proc.WaitForExit(2000);
             }
-
-            pythonProc?.Dispose();
-
-            var s = _cumulativeTimer.Snapshot();
-            LogRedirector.Info("PowerWordRelive.SpeakerSplit", "Session summary", new
+            catch
             {
-                files = s.TotalFiles,
-                segments = s.TotalSegments,
-                total_audio_s = s.TotalAudioDurationS,
-                total_elapsed_s = s.TotalElapsedS,
-                speed = s.Speed
-            });
+            }
         }
+
+        proc.Dispose();
+    }
+
+    private void LogSummary()
+    {
+        var s = _cumulativeTimer.Snapshot();
+        LogRedirector.Info("PowerWordRelive.SpeakerSplit", "Session summary", new
+        {
+            files = s.TotalFiles,
+            segments = s.TotalSegments,
+            total_audio_s = s.TotalAudioDurationS,
+            total_elapsed_s = s.TotalElapsedS,
+            speed = s.Speed
+        });
     }
 
     private Process LaunchPython()
     {
-        var torchHome = Path.Combine(_cacheRoot, "torch");
-        var hfHome = Path.Combine(_cacheRoot, "huggingface");
+        var torchHome = Path.Combine(_opt.CacheRoot, "torch");
+        var hfHome = Path.Combine(_opt.CacheRoot, "huggingface");
 
-        _fs.CreateDirectory(torchHome);
-        _fs.CreateDirectory(hfHome);
+        _opt.Fs.CreateDirectory(torchHome);
+        _opt.Fs.CreateDirectory(hfHome);
 
-        var arguments = $"\"{_pythonScriptPath}\" " +
-                        $"--output-dir \"{_outputDir}\" " +
-                        $"--embeddings-dir \"{_embeddingsDir}\" " +
-                        $"--hf-token \"{_hfToken}\" " +
-                        $"--segmentation-batch-size {_segBatchSize} " +
-                        $"--embedding-batch-size {_embBatchSize} " +
-                        $"--device \"{_device}\"";
+        var arguments = $"\"{_opt.PythonScriptPath}\" " +
+                        $"--output-dir \"{_opt.OutputDir}\" " +
+                        $"--embeddings-dir \"{_opt.EmbeddingsDir}\" " +
+                        $"--hf-token \"{_opt.HfToken}\" " +
+                        $"--segmentation-batch-size {_opt.SegBatchSize} " +
+                        $"--embedding-batch-size {_opt.EmbBatchSize} " +
+                        $"--device \"{_opt.Device}\"";
 
         var psi = new ProcessStartInfo
         {
-            FileName = _pythonPath,
+            FileName = _opt.PythonPath,
             Arguments = arguments,
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
@@ -180,9 +148,9 @@ public class SpeakerSplitProcess
 
         psi.Environment["TORCH_HOME"] = torchHome;
         psi.Environment["HF_HOME"] = hfHome;
-        psi.Environment["OMP_NUM_THREADS"] = _ompNumThreads.ToString();
-        psi.Environment["MKL_NUM_THREADS"] = _ompNumThreads.ToString();
-        if (_device == "cpu")
+        psi.Environment["OMP_NUM_THREADS"] = _opt.OmpNumThreads.ToString();
+        psi.Environment["MKL_NUM_THREADS"] = _opt.OmpNumThreads.ToString();
+        if (_opt.Device == "cpu")
             psi.Environment["CUDA_VISIBLE_DEVICES"] = "";
 
         return Process.Start(psi)!;
@@ -191,7 +159,7 @@ public class SpeakerSplitProcess
     private async Task ProcessPendingFilesAsync(
         StreamWriter stdin, StreamReader stdout, CancellationToken ct)
     {
-        var files = _fs.GetFiles(_inputDir, "*.wav")
+        var files = _opt.Fs.GetFiles(_opt.InputDir, "*.wav")
             .Where(f => !f.EndsWith(ProcessingExtension))
             .OrderBy(f => f)
             .ToList();
@@ -212,7 +180,7 @@ public class SpeakerSplitProcess
 
         try
         {
-            _fs.MoveFile(wavPath, processingPath);
+            _opt.Fs.MoveFile(wavPath, processingPath);
         }
         catch (Exception ex)
         {
@@ -229,7 +197,7 @@ public class SpeakerSplitProcess
             var request = JsonSerializer.Serialize(new
             {
                 input = processingPath,
-                match_threshold = _matchThreshold
+                match_threshold = _opt.MatchThreshold
             });
 
             await stdin.WriteLineAsync(request.AsMemory(), CancellationToken.None);
@@ -247,35 +215,9 @@ public class SpeakerSplitProcess
 
             if (root.TryGetProperty("segments", out var segsElement) &&
                 segsElement.GetArrayLength() > 0)
-            {
-                var speakerSet = new HashSet<string?>();
-                foreach (var seg in segsElement.EnumerateArray())
-                    speakerSet.Add(seg.GetProperty("speaker").GetString());
+                LogProgress(fileName, segsElement, root);
 
-                var timing = root.TryGetProperty("timing", out var t)
-                    ? TimingHelper.FromJson(t)
-                    : null;
-                _cumulativeTimer.Record(timing?.AudioDurationS ?? 0, segsElement.GetArrayLength());
-                var cumulative = _cumulativeTimer.Snapshot();
-
-                LogRedirector.Info("PowerWordRelive.SpeakerSplit",
-                    "File processed", new
-                    {
-                        input = fileName,
-                        speakers = speakerSet.ToList(),
-                        segments = segsElement.GetArrayLength(),
-                        timing = TimingHelper.ToLogData(timing),
-                        cumulative = new
-                        {
-                            files = cumulative.TotalFiles,
-                            total_audio_s = cumulative.TotalAudioDurationS,
-                            total_elapsed_s = cumulative.TotalElapsedS,
-                            speed = cumulative.Speed
-                        }
-                    });
-            }
-
-            _fs.DeleteFile(processingPath);
+            _opt.Fs.DeleteFile(processingPath);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -284,13 +226,42 @@ public class SpeakerSplitProcess
 
             try
             {
-                if (_fs.FileExists(processingPath))
-                    _fs.MoveFile(processingPath, wavPath);
+                if (_opt.Fs.FileExists(processingPath))
+                    _opt.Fs.MoveFile(processingPath, wavPath);
             }
             catch
             {
             }
         }
+    }
+
+    private void LogProgress(string fileName, JsonElement segsElement, JsonElement root)
+    {
+        var speakerSet = new HashSet<string?>();
+        foreach (var seg in segsElement.EnumerateArray())
+            speakerSet.Add(seg.GetProperty("speaker").GetString());
+
+        var timing = root.TryGetProperty("timing", out var t)
+            ? TimingParser.FromJson(t)
+            : null;
+        _cumulativeTimer.Record(timing?.AudioDurationS ?? 0, segsElement.GetArrayLength());
+        var cumulative = _cumulativeTimer.Snapshot();
+
+        LogRedirector.Info("PowerWordRelive.SpeakerSplit",
+            "File processed", new
+            {
+                input = fileName,
+                speakers = speakerSet.ToList(),
+                segments = segsElement.GetArrayLength(),
+                timing = TimingParser.ToLogData(timing),
+                cumulative = new
+                {
+                    files = cumulative.TotalFiles,
+                    total_audio_s = cumulative.TotalAudioDurationS,
+                    total_elapsed_s = cumulative.TotalElapsedS,
+                    speed = cumulative.Speed
+                }
+            });
     }
 
     private static async Task<string?> ReadLineAsync(StreamReader reader, CancellationToken ct)
