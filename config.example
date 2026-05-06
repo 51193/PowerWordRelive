@@ -1,9 +1,9 @@
-# LegendLore Configuration
+# PowerWordRelive Configuration
 # Format: domain.exact_config_key: value
 
 # Process definitions (project name -> process key)
-processes.audio_capture: LegendLore.AudioCapture
-processes.speaker_split: LegendLore.SpeakerSplit
+processes.audio_capture: PowerWordRelive.AudioCapture
+processes.speaker_split: PowerWordRelive.SpeakerSplit
 
 # Which domain configs to pass to each process
 process_config.audio_capture.domains: audio_capture,general
@@ -27,6 +27,9 @@ speaker_split.embeddings_dir: ./speaker_embeddings
 speaker_split.device: cpu
 speaker_split.poll_interval_sec: 1
 speaker_split.match_threshold: 0.55
+speaker_split.omp_num_threads: 8
+speaker_split.segmentation_batch_size: 64
+speaker_split.embedding_batch_size: 64
 
 # HuggingFace
 huggingface.token: hf_your_huggingface_token_here

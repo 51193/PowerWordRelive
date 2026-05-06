@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Speaker diarization — splits WAV by speaker, matches persisted embeddings."""
+"""Speaker diarization server — single process, JSON-line stdin/stdout."""
 
-import argparse
 import json
 import os
 import shutil
 import subprocess
 import sys
+import time
+import wave
 import warnings
 from pathlib import Path
 
@@ -111,17 +112,24 @@ def extract_audio(input_path: str, output_path: str, start: float, end: float):
     subprocess.run(cmd, check=True)
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Speaker diarization")
-    parser.add_argument("--input", required=True, help="Input WAV file")
+def run_server():
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Speaker diarization server")
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--embeddings-dir", required=True)
     parser.add_argument("--hf-token", default="")
-    parser.add_argument("--match-threshold", type=float, default=0.55)
+    parser.add_argument("--segmentation-batch-size", type=int, default=64)
+    parser.add_argument("--embedding-batch-size", type=int, default=64)
     parser.add_argument("--device", default="cpu")
     args = parser.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
+
+    import torch
+    omp_threads = os.environ.get("OMP_NUM_THREADS", "")
+    if omp_threads:
+        torch.set_num_threads(int(omp_threads))
 
     from pyannote.audio import Pipeline
 
@@ -131,75 +139,109 @@ def main():
     )
 
     if args.device != "cpu":
-        import torch
         pipeline.to(torch.device(args.device))
 
-    output = pipeline(args.input)
-    diarization = output.speaker_diarization
-    exclusive = output.exclusive_speaker_diarization
-    embeddings = output.speaker_embeddings
+    pipeline.segmentation_batch_size = args.segmentation_batch_size
+    pipeline.embedding_batch_size = args.embedding_batch_size
 
     known, next_id = load_embeddings(args.embeddings_dir)
 
-    labels = diarization.labels()
-    emb_map: dict[str, np.ndarray] = {}
-    if embeddings is not None and len(embeddings) > 0 and len(labels) > 0:
-        for s_idx, label in enumerate(labels):
-            if s_idx < embeddings.shape[0]:
-                emb_map[label] = embeddings[s_idx]
+    for line in sys.stdin:
+        line = line.strip()
+        if not line:
+            continue
 
-    label_to_persistent: dict[str, str] = {}
-    for label in labels:
-        emb = emb_map.get(label)
-        if emb is not None:
-            speaker_id, next_id = match_speaker(
-                np.array(emb), known, next_id, args.match_threshold)
-            if speaker_id not in known:
-                known[speaker_id] = [np.array(emb)]
-                persist_embedding(speaker_id, np.array(emb), args.embeddings_dir)
+        try:
+            req = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+
+        input_path = req["input"]
+        threshold = req.get("match_threshold", 0.55)
+        t_start = time.time()
+
+        try:
+            output = pipeline(input_path)
+        except Exception as e:
+            resp = {"error": str(e)}
+            print(json.dumps(resp, ensure_ascii=False), flush=True)
+            continue
+
+        diarization = output.speaker_diarization
+        exclusive = output.exclusive_speaker_diarization
+        embeddings = output.speaker_embeddings
+
+        labels = diarization.labels()
+        emb_map: dict[str, np.ndarray] = {}
+        if embeddings is not None and len(embeddings) > 0 and len(labels) > 0:
+            for s_idx, label in enumerate(labels):
+                if s_idx < embeddings.shape[0]:
+                    emb_map[label] = embeddings[s_idx]
+
+        label_to_persistent: dict[str, str] = {}
+        for label in labels:
+            emb = emb_map.get(label)
+            if emb is not None:
+                speaker_id, next_id = match_speaker(
+                    np.array(emb), known, next_id, threshold)
+                if speaker_id not in known:
+                    known[speaker_id] = [np.array(emb)]
+                    persist_embedding(speaker_id, np.array(emb), args.embeddings_dir)
+                else:
+                    avg_emb = np.mean(known[speaker_id], axis=0)
+                    persist_embedding(speaker_id, avg_emb, args.embeddings_dir)
             else:
-                avg_emb = np.mean(known[speaker_id], axis=0)
-                persist_embedding(speaker_id, avg_emb, args.embeddings_dir)
-        else:
-            speaker_id = f"speaker_{next_id}"
-            next_id += 1
-        label_to_persistent[label] = speaker_id
+                speaker_id = f"speaker_{next_id}"
+                next_id += 1
+            label_to_persistent[label] = speaker_id
 
-    input_stem = Path(args.input).stem
-    if input_stem.endswith(".wav"):
-        input_stem = input_stem[:-4]
-    unique_speakers = set(label_to_persistent.values())
+        input_stem = Path(input_path).stem
+        if input_stem.endswith(".wav"):
+            input_stem = input_stem[:-4]
+        unique_speakers = set(label_to_persistent.values())
 
-    segments = []
-    for segment, _, label in exclusive.itertracks(yield_label=True):
-        speaker_id = label_to_persistent[label]
-        offset_ms = int(segment.start * 1000)
-        output_filename = f"{input_stem}+{offset_ms:05d}+{speaker_id}.wav"
-        output_path = os.path.join(args.output_dir, output_filename)
-        extract_audio(args.input, output_path, segment.start, segment.end)
-        segments.append({
-            "file": output_filename,
-            "speaker": speaker_id,
-            "start": round(segment.start, 3),
-            "end": round(segment.end, 3),
-            "offset_ms": offset_ms
-        })
+        segments = []
+        for segment, _, label in exclusive.itertracks(yield_label=True):
+            speaker_id = label_to_persistent[label]
+            offset_ms = int(segment.start * 1000)
+            output_filename = f"{input_stem}+{offset_ms:05d}+{speaker_id}.wav"
+            output_path = os.path.join(args.output_dir, output_filename)
+            extract_audio(input_path, output_path, segment.start, segment.end)
+            segments.append({
+                "file": output_filename,
+                "speaker": speaker_id,
+                "start": round(segment.start, 3),
+                "end": round(segment.end, 3),
+                "offset_ms": offset_ms
+            })
 
-    if len(unique_speakers) == 1 and len(segments) >= 1:
-        speaker_id = segments[0]["speaker"]
-        new_name = f"{input_stem}+{speaker_id}.wav"
-        new_path = os.path.join(args.output_dir, new_name)
+        if len(unique_speakers) == 1 and len(segments) >= 1:
+            speaker_id = segments[0]["speaker"]
+            new_name = f"{input_stem}+{speaker_id}.wav"
+            new_path = os.path.join(args.output_dir, new_name)
 
-        shutil.copy2(args.input, new_path)
+            shutil.copy2(input_path, new_path)
 
-        for seg in segments:
-            seg_path = os.path.join(args.output_dir, seg["file"])
-            if os.path.exists(seg_path):
-                os.remove(seg_path)
-        segments = [{"file": new_name, "speaker": speaker_id, "start": 0.0, "end": -1.0}]
+            for seg in segments:
+                seg_path = os.path.join(args.output_dir, seg["file"])
+                if os.path.exists(seg_path):
+                    os.remove(seg_path)
+            segments = [{"file": new_name, "speaker": speaker_id, "start": 0.0, "end": -1.0}]
 
-    print(json.dumps(segments, ensure_ascii=False))
+        elapsed = time.time() - t_start
+        with wave.open(input_path, "rb") as wf:
+            audio_duration = wf.getnframes() / wf.getframerate()
+
+        resp = {
+            "segments": segments,
+            "timing": {
+                "audio_duration_s": round(audio_duration, 3),
+                "elapsed_s": round(elapsed, 3),
+                "speed": round(audio_duration / elapsed, 2) if elapsed > 0 else 0.0
+            }
+        }
+        print(json.dumps(resp, ensure_ascii=False), flush=True)
 
 
 if __name__ == "__main__":
-    main()
+    run_server()

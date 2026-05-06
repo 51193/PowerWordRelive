@@ -1,6 +1,0 @@
-namespace LegendLore.AudioCapture;
-
-public interface ISegmentHandler
-{
-    Task HandleSegmentAsync(string tempFilePath, DateTime startTime, CancellationToken ct);
-}

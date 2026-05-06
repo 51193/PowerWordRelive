@@ -10,4 +10,8 @@
     <Target Name="CopyConfig" AfterTargets="Build">
         <Copy SourceFiles="$(RepoRoot)config" DestinationFolder="$(CommonOutputDir)"/>
     </Target>
+
+    <Target Name="CopySetupScript" AfterTargets="Build">
+        <Copy SourceFiles="$(RepoRoot)scripts/setup.sh" DestinationFolder="$(CommonOutputDir)"/>
+    </Target>
 </Project>
