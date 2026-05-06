@@ -46,7 +46,7 @@ fs.CreateDirectory(outputDir);
 fs.CreateDirectory(embeddingsDir);
 
 var pythonPath = Path.Combine(AppContext.BaseDirectory, "speaker_split_venv", "bin", "python3");
-var pythonScriptPath = Path.Combine(AppContext.BaseDirectory, "speaker_diarize.py");
+var pythonScriptPath = Path.Combine(AppContext.BaseDirectory, "speaker_diarize_server.py");
 
 if (!fs.FileExists(pythonPath))
 {

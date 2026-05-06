@@ -29,7 +29,7 @@ internal class LogMultiplexer
             }
             catch (JsonException)
             {
-                // raw text, wrap as INFO
+                // 非 JSON 原始文本，包装为 INFO 级别转发
             }
 
             LogRedirector.Info(_processName, line);

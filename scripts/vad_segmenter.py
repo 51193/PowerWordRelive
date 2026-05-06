@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Silero VAD segmenter — reads PCM16 from stdin, writes segmented WAV files."""
+"""Silero VAD 分割器 — 从 stdin 读取 PCM16，输出分割后的 WAV 文件。"""
 import sys
 import os
 import io
@@ -21,7 +21,7 @@ SAMPLE_RATE = 16000
 FRAME_SAMPLES = 512
 BYTES_PER_SAMPLE = 2
 FRAME_BYTES = FRAME_SAMPLES * BYTES_PER_SAMPLE
-FRAME_DURATION_MS = FRAME_SAMPLES / SAMPLE_RATE * 1000  # 32ms
+FRAME_DURATION_MS = FRAME_SAMPLES / SAMPLE_RATE * 1000  # 32ms per frame
 VAD_THRESHOLD = 0.5
 
 

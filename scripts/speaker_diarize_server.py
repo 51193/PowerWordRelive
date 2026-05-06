@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Speaker diarization server — single process, JSON-line stdin/stdout."""
+"""说话人分离服务器 — 常驻进程，stdin/stdout JSON 行通信。"""
 
 import json
 import os

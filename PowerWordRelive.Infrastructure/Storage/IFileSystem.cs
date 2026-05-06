@@ -9,4 +9,7 @@ public interface IFileSystem
     void MoveFile(string source, string destination);
     void DeleteFile(string path);
     string[] ReadAllLines(string path);
+    bool TryAcquireForProcessing(string filePath, out string processingPath);
+    bool TryReleaseProcessing(string processingPath, string originalPath);
+    bool TryCompleteProcessing(string processingPath);
 }

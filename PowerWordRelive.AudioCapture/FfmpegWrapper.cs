@@ -72,7 +72,7 @@ internal class FfmpegWrapper
             }
             catch
             {
-                // pipe broken when ffmpeg killed, expected
+                // ffmpeg 被杀时管道断开，预期行为
             }
             finally
             {

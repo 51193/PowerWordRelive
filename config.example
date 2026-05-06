@@ -1,18 +1,20 @@
-# PowerWordRelive Configuration
-# Format: domain.exact_config_key: value
+# PowerWordRelive 配置文件
+# 格式：domain.配置键: 值
 
-# Process definitions (project name -> process key)
+# 进程定义（进程键 -> 项目名称）
 processes.audio_capture: PowerWordRelive.AudioCapture
 processes.speaker_split: PowerWordRelive.SpeakerSplit
+processes.transcribe: PowerWordRelive.Transcribe
 
-# Which domain configs to pass to each process
+# 传递给各进程的配置域
 process_config.audio_capture.domains: audio_capture,general
 process_config.speaker_split.domains: speaker_split,general,huggingface
+process_config.transcribe.domains: transcribe,general
 
-# General — work_root MUST be an absolute path
+# 通用配置 — work_root 必须是绝对路径
 general.work_root: /absolute/path/to/work/root
 
-# Audio Capture
+# 音频捕获
 audio_capture.output_dir: ./segments
 audio_capture.sample_rate: 16000
 audio_capture.silence_timeout_ms: 300
@@ -20,7 +22,7 @@ audio_capture.max_segment_sec: 120
 audio_capture.no_speech_timeout_sec: 30
 audio_capture.min_speech_ms: 500
 
-# Speaker Split
+# 说话人分离
 speaker_split.input_dir: ./segments
 speaker_split.output_dir: ./speaker_segments
 speaker_split.embeddings_dir: ./speaker_embeddings
@@ -31,5 +33,13 @@ speaker_split.omp_num_threads: 8
 speaker_split.segmentation_batch_size: 64
 speaker_split.embedding_batch_size: 64
 
-# HuggingFace
+# Whisper 转录
+transcribe.input_dir: ./speaker_segments
+transcribe.output_dir: ./transcriptions
+transcribe.model: turbo
+transcribe.device: cuda
+transcribe.initial_prompt: 简体中文
+transcribe.poll_interval_sec: 1
+
+# HuggingFace 令牌
 huggingface.token: hf_your_huggingface_token_here

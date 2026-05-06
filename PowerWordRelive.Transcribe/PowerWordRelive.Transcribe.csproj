@@ -12,11 +12,15 @@
     </ItemGroup>
 
     <Target Name="CopyPythonScript" AfterTargets="Build">
-        <Copy SourceFiles="$(RepoRoot)scripts\speaker_diarize_server.py" DestinationFolder="$(OutputPath)"/>
+        <Copy SourceFiles="$(RepoRoot)scripts\whisper_server.py" DestinationFolder="$(OutputPath)"/>
     </Target>
 
     <Target Name="CopyRequirements" AfterTargets="Build">
-        <Copy SourceFiles="$(RepoRoot)scripts\speaker_split_venv.requirements.txt" DestinationFolder="$(OutputPath)"/>
+        <Copy SourceFiles="$(RepoRoot)scripts\whisper_venv.requirements.txt" DestinationFolder="$(OutputPath)"/>
+    </Target>
+
+    <Target Name="CopyTorchInstaller" AfterTargets="Build">
+        <Copy SourceFiles="$(RepoRoot)scripts\install_torch_cuda.py" DestinationFolder="$(OutputPath)"/>
     </Target>
 
 </Project>
