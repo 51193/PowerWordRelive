@@ -66,40 +66,108 @@ internal class RecordingProcess
         }
         finally
         {
-            StopProcess(ffmpegProcess);
-            await Task.WhenAny(pythonProcess.WaitForExitAsync(ct), Task.Delay(2000, ct));
-            if (!pythonProcess.HasExited)
-                pythonProcess.Kill(true);
+            TeardownFfmpeg(ffmpegProcess);
+            await TeardownPython(pythonProcess, ct);
             await stderrTask;
+            LogRedirector.Info("PowerWordRelive.AudioCapture", "Child processes reclaimed");
         }
 
         LogRedirector.Info("PowerWordRelive.AudioCapture", "Recording process stopped");
     }
 
-    private static void StopProcess(Process process)
+    private void TeardownFfmpeg(Process process)
     {
+        var pid = process.Id;
         try
         {
             if (process.HasExited)
+            {
+                LogRedirector.Info("PowerWordRelive.AudioCapture",
+                    "ffmpeg already exited before teardown",
+                    new { pid, exitCode = process.ExitCode });
                 return;
+            }
+
+            LogRedirector.Info("PowerWordRelive.AudioCapture",
+                "Sending SIGINT to ffmpeg", new { pid });
 
             using var sigint = Process.Start(new ProcessStartInfo
             {
                 FileName = "kill",
-                Arguments = $"-INT {process.Id}",
+                Arguments = $"-INT {pid}",
                 UseShellExecute = false,
                 CreateNoWindow = true
             });
             sigint?.WaitForExit(500);
 
-            if (!process.HasExited)
+            if (process.HasExited)
             {
-                process.Kill(true);
-                process.WaitForExit(1000);
+                LogRedirector.Info("PowerWordRelive.AudioCapture",
+                    "ffmpeg exited after SIGINT", new { pid });
+                return;
             }
+
+            LogRedirector.Warn("PowerWordRelive.AudioCapture",
+                "ffmpeg did not exit after SIGINT, force killing", new { pid });
+            process.Kill(true);
+            process.WaitForExit(1000);
+
+            if (process.HasExited)
+                LogRedirector.Info("PowerWordRelive.AudioCapture",
+                    "ffmpeg killed", new { pid });
+            else
+                LogRedirector.Warn("PowerWordRelive.AudioCapture",
+                    "ffmpeg still alive after kill", new { pid });
         }
-        catch
+        catch (Exception ex)
         {
+            LogRedirector.Error("PowerWordRelive.AudioCapture",
+                "Error tearing down ffmpeg", new { pid, error = ex.Message });
+        }
+    }
+
+    private async Task TeardownPython(Process process, CancellationToken ct)
+    {
+        var pid = process.Id;
+        try
+        {
+            if (process.HasExited)
+            {
+                LogRedirector.Info("PowerWordRelive.AudioCapture",
+                    "Python VAD already exited before teardown",
+                    new { pid, exitCode = process.ExitCode });
+                return;
+            }
+
+            LogRedirector.Info("PowerWordRelive.AudioCapture",
+                "Waiting for Python VAD to exit", new { pid });
+
+            await Task.WhenAny(process.WaitForExitAsync(CancellationToken.None), Task.Delay(2000, ct));
+
+            if (process.HasExited)
+            {
+                LogRedirector.Info("PowerWordRelive.AudioCapture",
+                    "Python VAD exited gracefully", new { pid });
+                return;
+            }
+
+            LogRedirector.Warn("PowerWordRelive.AudioCapture",
+                "Python VAD did not exit, force killing", new { pid });
+            process.Kill(true);
+
+            await Task.WhenAny(process.WaitForExitAsync(CancellationToken.None), Task.Delay(2000, ct));
+
+            if (process.HasExited)
+                LogRedirector.Info("PowerWordRelive.AudioCapture",
+                    "Python VAD killed", new { pid });
+            else
+                LogRedirector.Warn("PowerWordRelive.AudioCapture",
+                    "Python VAD still alive after kill", new { pid });
+        }
+        catch (Exception ex)
+        {
+            LogRedirector.Error("PowerWordRelive.AudioCapture",
+                "Error tearing down Python VAD", new { pid, error = ex.Message });
         }
     }
 

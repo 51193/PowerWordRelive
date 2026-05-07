@@ -82,15 +82,42 @@ internal class ProcessManager
 
     public void KillAll()
     {
+        LogRedirector.Info("PowerWordRelive.Host", "Killing all child processes", new { count = _spawned.Count });
+
         foreach (var spawned in _spawned)
+        {
+            var pid = spawned.SystemProcess.Id;
+            var name = spawned.ProcessName;
+
             try
             {
-                if (!spawned.SystemProcess.HasExited)
-                    spawned.SystemProcess.Kill(true);
+                if (spawned.SystemProcess.HasExited)
+                {
+                    LogRedirector.Info("PowerWordRelive.Host", "Child process already exited before kill",
+                        new { process = name, pid, exitCode = spawned.SystemProcess.ExitCode });
+                    continue;
+                }
+
+                LogRedirector.Info("PowerWordRelive.Host", "Killing child process",
+                    new { process = name, pid });
+
+                spawned.SystemProcess.Kill(true);
+
+                spawned.SystemProcess.WaitForExit(3000);
+
+                if (spawned.SystemProcess.HasExited)
+                    LogRedirector.Info("PowerWordRelive.Host", "Child process killed",
+                        new { process = name, pid });
+                else
+                    LogRedirector.Warn("PowerWordRelive.Host", "Child process still alive after kill",
+                        new { process = name, pid });
             }
-            catch
+            catch (Exception ex)
             {
+                LogRedirector.Error("PowerWordRelive.Host", "Error killing child process",
+                    new { process = name, pid, error = ex.Message });
             }
+        }
     }
 
     private List<ProcessDefinition> GetProcessDefinitions()

@@ -70,37 +70,52 @@ internal class SpeakerSplitProcess
         {
         }
 
-        if (proc is null || proc.HasExited)
-        {
-            proc?.Dispose();
+        if (proc is null)
             return;
-        }
+
+        var pid = proc.Id;
 
         try
         {
+            if (proc.HasExited)
+            {
+                LogRedirector.Info("PowerWordRelive.SpeakerSplit",
+                    "Python diarization server already exited before teardown",
+                    new { pid, exitCode = proc.ExitCode });
+                proc.Dispose();
+                return;
+            }
+
+            LogRedirector.Info("PowerWordRelive.SpeakerSplit",
+                "Waiting for Python diarization server to exit", new { pid });
+
             proc.WaitForExit(5000);
-        }
-        catch
-        {
-        }
 
-        if (!proc.HasExited)
-        {
-            try
+            if (proc.HasExited)
             {
-                proc.Kill(true);
-            }
-            catch
-            {
+                LogRedirector.Info("PowerWordRelive.SpeakerSplit",
+                    "Python diarization server exited gracefully", new { pid });
+                proc.Dispose();
+                return;
             }
 
-            try
-            {
-                proc.WaitForExit(2000);
-            }
-            catch
-            {
-            }
+            LogRedirector.Warn("PowerWordRelive.SpeakerSplit",
+                "Python diarization server did not exit, force killing", new { pid });
+
+            proc.Kill(true);
+            proc.WaitForExit(2000);
+
+            if (proc.HasExited)
+                LogRedirector.Info("PowerWordRelive.SpeakerSplit",
+                    "Python diarization server killed", new { pid });
+            else
+                LogRedirector.Warn("PowerWordRelive.SpeakerSplit",
+                    "Python diarization server still alive after kill", new { pid });
+        }
+        catch (Exception ex)
+        {
+            LogRedirector.Error("PowerWordRelive.SpeakerSplit",
+                "Error tearing down Python diarization server", new { pid, error = ex.Message });
         }
 
         proc.Dispose();

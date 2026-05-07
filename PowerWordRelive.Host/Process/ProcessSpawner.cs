@@ -33,8 +33,12 @@ internal class ProcessSpawner
         var stdoutTask = multiplexer.ReadStdoutAsync(process.StandardOutput);
         var stderrTask = multiplexer.ReadStderrAsync(process.StandardError);
 
-        return new SpawnedProcess(process, stdoutTask, stderrTask);
+        return new SpawnedProcess(processName, process, stdoutTask, stderrTask);
     }
 
-    public record SpawnedProcess(System.Diagnostics.Process SystemProcess, Task StdoutTask, Task StderrTask);
+    public record SpawnedProcess(
+        string ProcessName,
+        System.Diagnostics.Process SystemProcess,
+        Task StdoutTask,
+        Task StderrTask);
 }

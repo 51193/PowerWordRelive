@@ -1,4 +1,4 @@
-# Power Word Relive（律令重现）
+# Power Word Relive
 
 实时捕获系统音频，将连续语音切分为按说话人分离的音频片段，为桌面 TRPG 场景提供离线的对话结构化能力。
 

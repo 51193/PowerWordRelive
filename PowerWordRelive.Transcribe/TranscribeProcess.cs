@@ -216,37 +216,52 @@ internal class TranscribeProcess
         {
         }
 
-        if (proc is null || proc.HasExited)
-        {
-            proc?.Dispose();
+        if (proc is null)
             return;
-        }
+
+        var pid = proc.Id;
 
         try
         {
+            if (proc.HasExited)
+            {
+                LogRedirector.Info("PowerWordRelive.Transcribe",
+                    "Python Whisper server already exited before teardown",
+                    new { pid, exitCode = proc.ExitCode });
+                proc.Dispose();
+                return;
+            }
+
+            LogRedirector.Info("PowerWordRelive.Transcribe",
+                "Waiting for Python Whisper server to exit", new { pid });
+
             proc.WaitForExit(5000);
-        }
-        catch
-        {
-        }
 
-        if (!proc.HasExited)
-        {
-            try
+            if (proc.HasExited)
             {
-                proc.Kill(true);
-            }
-            catch
-            {
+                LogRedirector.Info("PowerWordRelive.Transcribe",
+                    "Python Whisper server exited gracefully", new { pid });
+                proc.Dispose();
+                return;
             }
 
-            try
-            {
-                proc.WaitForExit(2000);
-            }
-            catch
-            {
-            }
+            LogRedirector.Warn("PowerWordRelive.Transcribe",
+                "Python Whisper server did not exit, force killing", new { pid });
+
+            proc.Kill(true);
+            proc.WaitForExit(2000);
+
+            if (proc.HasExited)
+                LogRedirector.Info("PowerWordRelive.Transcribe",
+                    "Python Whisper server killed", new { pid });
+            else
+                LogRedirector.Warn("PowerWordRelive.Transcribe",
+                    "Python Whisper server still alive after kill", new { pid });
+        }
+        catch (Exception ex)
+        {
+            LogRedirector.Error("PowerWordRelive.Transcribe",
+                "Error tearing down Python Whisper server", new { pid, error = ex.Message });
         }
 
         proc.Dispose();
