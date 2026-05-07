@@ -1,18 +1,22 @@
 using System.Diagnostics;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using PowerWordRelive.Infrastructure.Logging;
 
 namespace PowerWordRelive.LLMRequester.Core;
 
-public record LlmRequestConfig(string Model, bool ThinkingEnabled, string ReasoningEffort);
+public record LlmRequestConfig(string Model, bool ThinkingEnabled, string ReasoningEffort, int ContextWindow);
 
 public record LlmResponse(string Content, int OutputTokens, int CachedInputTokens, int MissInputTokens);
 
 public class LlmApiClient
 {
     private static readonly HttpClient HttpClient = new();
+#if DEBUG
+    private static readonly object LogLock = new();
+#endif
 
     public async Task<LlmResponse> SendAsync(
         string apiUrl,
@@ -38,10 +42,12 @@ public class LlmApiClient
 
         var requestJson = JsonSerializer.Serialize(body, new JsonSerializerOptions
         {
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
         });
 
         var requestCharCount = requestJson.Length;
+        var sendTime = DateTime.Now;
         var sw = Stopwatch.StartNew();
 
         using var request = new HttpRequestMessage(HttpMethod.Post, apiUrl);
@@ -50,8 +56,13 @@ public class LlmApiClient
 
         using var response = await HttpClient.SendAsync(request);
         sw.Stop();
+        var receiveTime = DateTime.Now;
 
         var responseJson = await response.Content.ReadAsStringAsync();
+
+#if DEBUG
+        AppendDebugLog(sendTime, receiveTime, requestJson, responseJson);
+#endif
 
         if (!response.IsSuccessStatusCode)
         {
@@ -95,4 +106,31 @@ public class LlmApiClient
 
         return new LlmResponse(content, outputTokens, cachedInputTokens, missInputTokens);
     }
+
+#if DEBUG
+    private static void AppendDebugLog(
+        DateTime sendTime,
+        DateTime receiveTime,
+        string requestJson,
+        string responseJson)
+    {
+        var logPath = Path.Combine(AppContext.BaseDirectory, "prompts.log");
+        var ts = sendTime.ToString("yyyy-MM-dd HH:mm:ss");
+        var tr = receiveTime.ToString("yyyy-MM-dd HH:mm:ss");
+
+        var entry = $"""
+                     === LLM Request  @ {ts} ===
+                     {requestJson}
+                     --- LLM Response @ {tr} ---
+                     {responseJson}
+                     ==============================
+
+                     """;
+
+        lock (LogLock)
+        {
+            File.AppendAllText(logPath, entry);
+        }
+    }
+#endif
 }

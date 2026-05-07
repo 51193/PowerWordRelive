@@ -18,6 +18,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PowerWordRelive.Infrastruct
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PowerWordRelive.LLMRequester", "PowerWordRelive.LLMRequester\PowerWordRelive.LLMRequester.csproj", "{A86017A1-2E49-4DFD-992A-E34A521E52DF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PowerWordRelive.LLMRequester.Tests", "PowerWordRelive.LLMRequester.Tests\PowerWordRelive.LLMRequester.Tests.csproj", "{968062A0-8A42-44D3-92E9-3FBDC185F95B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -136,6 +138,18 @@ Global
 		{A86017A1-2E49-4DFD-992A-E34A521E52DF}.Release|x64.Build.0 = Release|Any CPU
 		{A86017A1-2E49-4DFD-992A-E34A521E52DF}.Release|x86.ActiveCfg = Release|Any CPU
 		{A86017A1-2E49-4DFD-992A-E34A521E52DF}.Release|x86.Build.0 = Release|Any CPU
+		{968062A0-8A42-44D3-92E9-3FBDC185F95B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{968062A0-8A42-44D3-92E9-3FBDC185F95B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{968062A0-8A42-44D3-92E9-3FBDC185F95B}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{968062A0-8A42-44D3-92E9-3FBDC185F95B}.Debug|x64.Build.0 = Debug|Any CPU
+		{968062A0-8A42-44D3-92E9-3FBDC185F95B}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{968062A0-8A42-44D3-92E9-3FBDC185F95B}.Debug|x86.Build.0 = Debug|Any CPU
+		{968062A0-8A42-44D3-92E9-3FBDC185F95B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{968062A0-8A42-44D3-92E9-3FBDC185F95B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{968062A0-8A42-44D3-92E9-3FBDC185F95B}.Release|x64.ActiveCfg = Release|Any CPU
+		{968062A0-8A42-44D3-92E9-3FBDC185F95B}.Release|x64.Build.0 = Release|Any CPU
+		{968062A0-8A42-44D3-92E9-3FBDC185F95B}.Release|x86.ActiveCfg = Release|Any CPU
+		{968062A0-8A42-44D3-92E9-3FBDC185F95B}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

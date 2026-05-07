@@ -59,6 +59,7 @@ llm_request.timer.speaker_identification: 300
 llm_request.speaker_identification.model: deepseek-v4-pro
 llm_request.speaker_identification.thinking_enabled: true
 llm_request.speaker_identification.reasoning_effort: high
+llm_request.speaker_identification.context_window: 2
 
 # 持久化存储（SQLite）
 storage.sqlite_path: ./data/pwr.db

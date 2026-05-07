@@ -37,22 +37,55 @@ public class LLMDatabase : IDisposable
         return list;
     }
 
-    public List<string> GetDialogueForSpeaker(string speakerId)
+    public List<long> GetTranscriptionIdsForSpeaker(string speakerId)
     {
-        var lines = new List<string>();
+        var ids = new List<long>();
 
         using var cmd = _connection.CreateCommand();
-        cmd.CommandText = @"
-            SELECT text FROM transcriptions
-            WHERE speaker_id = @speaker
-            ORDER BY start_timestamp_ms";
+        cmd.CommandText = "SELECT id FROM transcriptions WHERE speaker_id = @speaker ORDER BY id";
         cmd.Parameters.AddWithValue("@speaker", speakerId);
 
         using var reader = cmd.ExecuteReader();
         while (reader.Read())
-            lines.Add(reader.GetString(0));
+            ids.Add(reader.GetInt64(0));
 
-        return lines;
+        return ids;
+    }
+
+    public List<DialogueEntry> GetDialogueRange(long minId, long maxId)
+    {
+        var entries = new List<DialogueEntry>();
+
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = @"
+            SELECT id, speaker_id, text FROM transcriptions
+            WHERE id BETWEEN @min AND @max
+            ORDER BY id";
+        cmd.Parameters.AddWithValue("@min", minId);
+        cmd.Parameters.AddWithValue("@max", maxId);
+
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+            entries.Add(new DialogueEntry(
+                reader.GetInt64(0),
+                reader.GetString(1),
+                reader.GetString(2)));
+
+        return entries;
+    }
+
+    public Dictionary<string, string> GetSpeakerNameMap()
+    {
+        var map = new Dictionary<string, string>();
+
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = "SELECT speaker_id, role_name FROM speaker_mappings";
+
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+            map[reader.GetString(0)] = reader.GetString(1);
+
+        return map;
     }
 
     public void UpdateSpeakerRole(string speakerId, string roleName)

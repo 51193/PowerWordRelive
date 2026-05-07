@@ -1,7 +1,9 @@
+using Microsoft.Data.Sqlite;
 using PowerWordRelive.Infrastructure.Logging;
 using PowerWordRelive.Infrastructure.Prompt;
 using PowerWordRelive.LLMRequester.Core;
 using PowerWordRelive.LLMRequester.Database;
+using PowerWordRelive.LLMRequester.Models;
 
 namespace PowerWordRelive.LLMRequester.Requests;
 
@@ -10,6 +12,10 @@ internal class SpeakerIdentificationRequest : IRequest
     private const string SystemPromptFile = "prompts/speaker_id_system.md";
     private const string UserPromptFile = "prompts/speaker_id_user.md";
     private const string UnknownMarker = "__UNKNOWN__";
+    private const string ClusterSeparator = "\n---对话分割---\n";
+    private const int MaxClustersBeforeSampling = 15;
+    private const int HeadKeep = 3;
+    private const int TailKeep = 12;
 
     private readonly string _apiUrl;
     private readonly string _token;
@@ -36,9 +42,23 @@ internal class SpeakerIdentificationRequest : IRequest
 
     public async Task Request()
     {
-        var unassigned = _db.GetUnassignedSpeakers();
-        if (unassigned.Count == 0)
+        List<SpeakerMapping> unassigned;
+        Dictionary<string, string> nameMap;
+
+        try
+        {
+            unassigned = _db.GetUnassignedSpeakers();
+            if (unassigned.Count == 0)
+                return;
+
+            nameMap = _db.GetSpeakerNameMap();
+        }
+        catch (SqliteException ex)
+        {
+            LogRedirector.Info("PowerWordRelive.LLMRequester",
+                $"Database not ready: {ex.Message}");
             return;
+        }
 
         LogRedirector.Info("PowerWordRelive.LLMRequester",
             $"Processing {unassigned.Count} unassigned speaker(s)");
@@ -46,18 +66,19 @@ internal class SpeakerIdentificationRequest : IRequest
         foreach (var spk in unassigned)
             try
             {
-                var dialogue = _db.GetDialogueForSpeaker(spk.SpeakerId);
-                if (dialogue.Count == 0)
+                var ids = _db.GetTranscriptionIdsForSpeaker(spk.SpeakerId);
+                if (ids.Count == 0)
                 {
                     LogRedirector.Warn("PowerWordRelive.LLMRequester",
                         $"No dialogue found for speaker '{spk.SpeakerId}', skipping");
                     continue;
                 }
 
-                var combinedText = string.Join("\n", dialogue);
-                var emptyVars = new Dictionary<string, string>();
-                var userVars = new Dictionary<string, string> { ["dialogue"] = combinedText };
+                var clusters = DialogueClusterer.BuildClusters(ids, _config.ContextWindow);
+                var dialogueText = BuildDialogueText(clusters, spk.SpeakerId, nameMap);
 
+                var emptyVars = new Dictionary<string, string>();
+                var userVars = new Dictionary<string, string> { ["dialogue"] = dialogueText };
                 var systemPrompt = _assembler.Assemble(SystemPromptFile, emptyVars);
                 var userPrompt = _assembler.Assemble(UserPromptFile, userVars);
 
@@ -81,5 +102,41 @@ internal class SpeakerIdentificationRequest : IRequest
                 LogRedirector.Error("PowerWordRelive.LLMRequester",
                     $"Failed to identify speaker '{spk.SpeakerId}': {ex.Message}");
             }
+    }
+
+    private string BuildDialogueText(
+        List<List<long>> clusters,
+        string targetSpeakerId,
+        Dictionary<string, string> nameMap)
+    {
+        var segments = new List<string>();
+        var totalClusters = clusters.Count;
+        int omitted;
+
+        if (totalClusters > MaxClustersBeforeSampling)
+        {
+            omitted = totalClusters - HeadKeep - TailKeep;
+            clusters = clusters.Take(HeadKeep)
+                .Concat(clusters.Skip(totalClusters - TailKeep))
+                .ToList();
+        }
+        else
+        {
+            omitted = 0;
+        }
+
+        foreach (var cluster in clusters)
+        {
+            var minId = cluster[0] - _config.ContextWindow;
+            var maxId = cluster[^1] + _config.ContextWindow;
+            var entries = _db.GetDialogueRange(minId, maxId);
+            var formatted = DialogueClusterer.FormatContext(entries, targetSpeakerId, nameMap);
+            segments.Add(formatted);
+        }
+
+        if (omitted > 0)
+            segments.Add($"--- 省略 {omitted} 段对话 ---");
+
+        return string.Join(ClusterSeparator, segments);
     }
 }

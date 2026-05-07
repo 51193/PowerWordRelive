@@ -61,9 +61,8 @@ if (!fs.DirectoryExists(textDataBaseDir))
 
 if (!fs.FileExists(sqlitePath))
 {
-    LogRedirector.Error("PowerWordRelive.LLMRequester",
-        $"SQLite database not found: {sqlitePath}");
-    return 1;
+    LogRedirector.Warn("PowerWordRelive.LLMRequester",
+        $"SQLite database not yet available: {sqlitePath}, will wait for producer");
 }
 
 var timerIntervals = new Dictionary<string, TimeSpan>();
@@ -90,6 +89,7 @@ foreach (var key in timerIntervals.Keys)
     var model = llmRequestConfig.GetValueOrDefault($"{key}.model", "deepseek-v4-pro");
     var thinkingStr = llmRequestConfig.GetValueOrDefault($"{key}.thinking_enabled", "false");
     var reasoningStr = llmRequestConfig.GetValueOrDefault($"{key}.reasoning_effort", "high");
+    var contextWindowStr = llmRequestConfig.GetValueOrDefault($"{key}.context_window", "2");
 
     var thinkingEnabled = thinkingStr.Equals("true", StringComparison.OrdinalIgnoreCase);
 
@@ -106,7 +106,14 @@ foreach (var key in timerIntervals.Keys)
         _ => "high"
     };
 
-    requestConfigs[key] = new LlmRequestConfig(model, thinkingEnabled, reasoningEffort);
+    if (!int.TryParse(contextWindowStr, out var contextWindow) || contextWindow < 0)
+    {
+        LogRedirector.Warn("PowerWordRelive.LLMRequester",
+            $"Invalid context_window for '{key}': {contextWindowStr}, defaulting to 2");
+        contextWindow = 2;
+    }
+
+    requestConfigs[key] = new LlmRequestConfig(model, thinkingEnabled, reasoningEffort, contextWindow);
 }
 
 if (timerIntervals.Count == 0)
