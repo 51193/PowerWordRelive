@@ -2,18 +2,28 @@
 """说话人分离服务器 — 常驻进程，stdin/stdout JSON 行通信。"""
 
 import json
+import logging
 import os
 import shutil
 import subprocess
 import sys
 import time
 import wave
-import warnings
 from pathlib import Path
 
 import numpy as np
 
-warnings.filterwarnings("ignore")
+logging.getLogger("transformers").setLevel(logging.ERROR)
+
+
+class _SuppressNoiseFilter(logging.Filter):
+    _noise = ["trust_remote_code"]
+
+    def filter(self, record):
+        return not any(kw in record.getMessage() for kw in self._noise)
+
+
+logging.getLogger().addFilter(_SuppressNoiseFilter())
 
 MAX_EMBEDDINGS_PER_SPEAKER = 5
 REF_MIN_SIMILARITY = 0.30

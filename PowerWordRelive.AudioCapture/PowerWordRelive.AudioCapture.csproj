@@ -19,4 +19,8 @@
         <Copy SourceFiles="$(RepoRoot)scripts\vad_venv.requirements.txt" DestinationFolder="$(OutputPath)"/>
     </Target>
 
+    <Target Name="CopyDownloadScript" AfterTargets="Build">
+        <Copy SourceFiles="$(RepoRoot)scripts\download_vad_model.py" DestinationFolder="$(OutputPath)"/>
+    </Target>
+
 </Project>

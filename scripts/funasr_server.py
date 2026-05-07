@@ -1,12 +1,28 @@
 #!/usr/bin/env python3
 """FunASR Paraformer 转录服务器 — 常驻进程，stdin/stdout JSON 行通信。"""
 import json
+import logging
 import os
 import re
 import sys
 import time
 import wave
 from pathlib import Path
+
+logging.getLogger("transformers").setLevel(logging.ERROR)
+logging.getLogger("modelscope").setLevel(logging.ERROR)
+
+
+class _SuppressNoiseFilter(logging.Filter):
+    """仅屏蔽已知无害的内部噪声，不拦截真正的 WARNING/ERROR。"""
+    _noise = ["trust_remote_code"]
+
+    def filter(self, record):
+        msg = record.getMessage()
+        return not any(kw in msg for kw in self._noise)
+
+
+logging.getLogger().addFilter(_SuppressNoiseFilter())
 
 
 def _clean_paraformer_text(text, timestamps):
@@ -116,9 +132,10 @@ def run_server():
 
     from funasr import AutoModel
 
-    # FunASR 在导入和初始化时会向 stdout 输出版本/下载信息，重定向到 stderr 避免污染 JSON 协议。
+    # FunASR 在初始化时会向 stdout 输出版本/下载信息，重定向到 /dev/null 避免污染 JSON 协议和日志。
+    devnull = open(os.devnull, "w")
     old_stdout = sys.stdout
-    sys.stdout = sys.stderr
+    sys.stdout = devnull
     try:
         model = AutoModel(
             model=args.model,
@@ -130,6 +147,7 @@ def run_server():
         )
     finally:
         sys.stdout = old_stdout
+        devnull.close()
 
     for line in sys.stdin:
         line = line.strip()

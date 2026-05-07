@@ -3,6 +3,19 @@
 import sys
 import os
 import io
+import logging
+
+logging.getLogger("transformers").setLevel(logging.ERROR)
+
+
+class _SuppressNoiseFilter(logging.Filter):
+    _noise = ["trust_remote_code"]
+
+    def filter(self, record):
+        return not any(kw in record.getMessage() for kw in self._noise)
+
+
+logging.getLogger().addFilter(_SuppressNoiseFilter())
 import wave
 import signal
 import argparse
