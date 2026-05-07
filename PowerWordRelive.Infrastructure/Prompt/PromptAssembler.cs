@@ -1,0 +1,71 @@
+using System.Text.RegularExpressions;
+using PowerWordRelive.Infrastructure.Storage;
+
+namespace PowerWordRelive.Infrastructure.Prompt;
+
+public class PromptAssembler
+{
+    private static readonly Regex PlaceholderRegex = new(@"\{\{(.+?)\}\}", RegexOptions.Compiled);
+
+    private readonly IFileSystem _fs;
+    private readonly string _promptBaseDir;
+    private readonly int _maxDepth;
+
+    public PromptAssembler(IFileSystem fs, string promptBaseDir, int maxDepth = 10)
+    {
+        _fs = fs;
+        _promptBaseDir = promptBaseDir;
+        _maxDepth = maxDepth;
+    }
+
+    public string Assemble(string relativePath, Dictionary<string, string> variables)
+    {
+        return AssembleInternal(relativePath, variables, 0);
+    }
+
+    private string AssembleInternal(string relativePath, Dictionary<string, string> variables, int depth)
+    {
+        if (depth > _maxDepth)
+            throw new InvalidPromptException(
+                $"Prompt recursion depth exceeded ({_maxDepth}) at: {relativePath}");
+
+        var fullPath = Path.GetFullPath(Path.Combine(_promptBaseDir, relativePath));
+
+        if (!_fs.FileExists(fullPath))
+            throw new InvalidPromptException($"Prompt template not found: {fullPath}");
+
+        var content = _fs.ReadAllText(fullPath);
+
+        return PlaceholderRegex.Replace(content, match =>
+        {
+            var inner = match.Groups[1].Value.Trim();
+
+            if (inner.StartsWith("dir:"))
+            {
+                var dirPath = inner["dir:".Length..].Trim();
+                if (string.IsNullOrWhiteSpace(dirPath))
+                    throw new InvalidPromptException(
+                        $"Empty dir path in template: {relativePath}");
+
+                return AssembleInternal(dirPath, variables, depth + 1);
+            }
+
+            if (inner.StartsWith("value:"))
+            {
+                var key = inner["value:".Length..].Trim();
+                if (string.IsNullOrWhiteSpace(key))
+                    throw new InvalidPromptException(
+                        $"Empty value key in template: {relativePath}");
+
+                if (!variables.TryGetValue(key, out var value))
+                    throw new InvalidPromptException(
+                        $"Variable '{key}' not found in dictionary, referenced in: {relativePath}");
+
+                return value;
+            }
+
+            throw new InvalidPromptException(
+                $"Unknown placeholder type in template '{relativePath}': {{{{{inner}}}}}");
+        });
+    }
+}

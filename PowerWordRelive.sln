@@ -14,6 +14,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PowerWordRelive.Transcribe"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PowerWordRelive.TranscriptionStore", "PowerWordRelive.TranscriptionStore\PowerWordRelive.TranscriptionStore.csproj", "{5CC27D91-C1A3-440B-9B40-250A0A145754}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PowerWordRelive.Infrastructure.Tests", "PowerWordRelive.Infrastructure.Tests\PowerWordRelive.Infrastructure.Tests.csproj", "{46167475-15E4-4283-BB1B-14B7BF6B5CBE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -108,6 +110,18 @@ Global
 		{5CC27D91-C1A3-440B-9B40-250A0A145754}.Release|x64.Build.0 = Release|Any CPU
 		{5CC27D91-C1A3-440B-9B40-250A0A145754}.Release|x86.ActiveCfg = Release|Any CPU
 		{5CC27D91-C1A3-440B-9B40-250A0A145754}.Release|x86.Build.0 = Release|Any CPU
+		{46167475-15E4-4283-BB1B-14B7BF6B5CBE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{46167475-15E4-4283-BB1B-14B7BF6B5CBE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{46167475-15E4-4283-BB1B-14B7BF6B5CBE}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{46167475-15E4-4283-BB1B-14B7BF6B5CBE}.Debug|x64.Build.0 = Debug|Any CPU
+		{46167475-15E4-4283-BB1B-14B7BF6B5CBE}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{46167475-15E4-4283-BB1B-14B7BF6B5CBE}.Debug|x86.Build.0 = Debug|Any CPU
+		{46167475-15E4-4283-BB1B-14B7BF6B5CBE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{46167475-15E4-4283-BB1B-14B7BF6B5CBE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{46167475-15E4-4283-BB1B-14B7BF6B5CBE}.Release|x64.ActiveCfg = Release|Any CPU
+		{46167475-15E4-4283-BB1B-14B7BF6B5CBE}.Release|x64.Build.0 = Release|Any CPU
+		{46167475-15E4-4283-BB1B-14B7BF6B5CBE}.Release|x86.ActiveCfg = Release|Any CPU
+		{46167475-15E4-4283-BB1B-14B7BF6B5CBE}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

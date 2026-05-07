@@ -39,6 +39,11 @@ public class LocalFileSystem : IFileSystem
         return File.ReadAllLines(path);
     }
 
+    public string ReadAllText(string path)
+    {
+        return File.ReadAllText(path);
+    }
+
     public bool TryAcquireForProcessing(string filePath, out string processingPath)
     {
         processingPath = filePath + ProcessingExtension;

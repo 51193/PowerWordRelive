@@ -49,5 +49,8 @@ transcription_store.poll_interval_sec: 1
 # 持久化存储（SQLite）
 storage.sqlite_path: ./data/pwr.db
 
+# 提示词模板
+prompt.prompt_base_dir: prompts/
+
 # HuggingFace 令牌
 huggingface.token: hf_your_huggingface_token_here
