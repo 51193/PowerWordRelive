@@ -35,12 +35,11 @@ speaker_split.omp_num_threads: 8
 speaker_split.segmentation_batch_size: 64
 speaker_split.embedding_batch_size: 64
 
-# Whisper 转录
+# 语音转录
 transcribe.input_dir: ./speaker_segments
 transcribe.output_dir: ./transcriptions
-transcribe.model: turbo
+transcribe.model: paraformer-zh
 transcribe.device: cuda
-transcribe.initial_prompt: 以下是普通话
 transcribe.poll_interval_sec: 1
 
 # 转录入库

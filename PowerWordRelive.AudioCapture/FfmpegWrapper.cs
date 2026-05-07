@@ -57,8 +57,9 @@ internal class FfmpegWrapper
             CreateNoWindow = true
         };
 
-        pythonPsi.Environment["TORCH_HOME"] = _torchHome;
         _fs.CreateDirectory(_torchHome);
+
+        pythonPsi.Environment["TORCH_HOME"] = _torchHome;
 
         var ffmpegProcess = Process.Start(ffmpegPsi)!;
         var pythonProcess = Process.Start(pythonPsi)!;

@@ -64,15 +64,16 @@ internal class TranscribeProcess
     {
         var torchHome = Path.Combine(_opt.CacheRoot, "torch");
         var hfHome = Path.Combine(_opt.CacheRoot, "huggingface");
+        var modelscopeHome = Path.Combine(_opt.CacheRoot, "modelscope");
 
         _opt.Fs.CreateDirectory(torchHome);
         _opt.Fs.CreateDirectory(hfHome);
+        _opt.Fs.CreateDirectory(modelscopeHome);
 
         var arguments = $"\"{_opt.PythonScriptPath}\" " +
                         $"--output-dir \"{_opt.OutputDir}\" " +
                         $"--model \"{_opt.Model}\" " +
-                        $"--device \"{_opt.Device}\" " +
-                        $"--initial-prompt \"{_opt.InitialPrompt}\"";
+                        $"--device \"{_opt.Device}\"";
 
         var psi = new ProcessStartInfo
         {
@@ -87,6 +88,7 @@ internal class TranscribeProcess
 
         psi.Environment["TORCH_HOME"] = torchHome;
         psi.Environment["HF_HOME"] = hfHome;
+        psi.Environment["MODELSCOPE_CACHE"] = modelscopeHome;
 
         return Process.Start(psi)!;
     }
@@ -226,42 +228,42 @@ internal class TranscribeProcess
             if (proc.HasExited)
             {
                 LogRedirector.Info("PowerWordRelive.Transcribe",
-                    "Python Whisper server already exited before teardown",
+                    "Python FunASR server already exited before teardown",
                     new { pid, exitCode = proc.ExitCode });
                 proc.Dispose();
                 return;
             }
 
             LogRedirector.Info("PowerWordRelive.Transcribe",
-                "Waiting for Python Whisper server to exit", new { pid });
+                "Waiting for Python FunASR server to exit", new { pid });
 
             proc.WaitForExit(5000);
 
             if (proc.HasExited)
             {
                 LogRedirector.Info("PowerWordRelive.Transcribe",
-                    "Python Whisper server exited gracefully", new { pid });
+                    "Python FunASR server exited gracefully", new { pid });
                 proc.Dispose();
                 return;
             }
 
             LogRedirector.Warn("PowerWordRelive.Transcribe",
-                "Python Whisper server did not exit, force killing", new { pid });
+                "Python FunASR server did not exit, force killing", new { pid });
 
             proc.Kill(true);
             proc.WaitForExit(2000);
 
             if (proc.HasExited)
                 LogRedirector.Info("PowerWordRelive.Transcribe",
-                    "Python Whisper server killed", new { pid });
+                    "Python FunASR server killed", new { pid });
             else
                 LogRedirector.Warn("PowerWordRelive.Transcribe",
-                    "Python Whisper server still alive after kill", new { pid });
+                    "Python FunASR server still alive after kill", new { pid });
         }
         catch (Exception ex)
         {
             LogRedirector.Error("PowerWordRelive.Transcribe",
-                "Error tearing down Python Whisper server", new { pid, error = ex.Message });
+                "Error tearing down Python FunASR server", new { pid, error = ex.Message });
         }
 
         proc.Dispose();

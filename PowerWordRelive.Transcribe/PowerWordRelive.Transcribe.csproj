@@ -11,16 +11,12 @@
         <ProjectReference Include="..\PowerWordRelive.Infrastructure\PowerWordRelive.Infrastructure.csproj"/>
     </ItemGroup>
 
-    <Target Name="CopyPythonScript" AfterTargets="Build">
-        <Copy SourceFiles="$(RepoRoot)scripts\whisper_server.py" DestinationFolder="$(OutputPath)"/>
+    <Target Name="CopyFunasrScript" AfterTargets="Build">
+        <Copy SourceFiles="$(RepoRoot)scripts\funasr_server.py" DestinationFolder="$(OutputPath)"/>
     </Target>
 
-    <Target Name="CopyRequirements" AfterTargets="Build">
-        <Copy SourceFiles="$(RepoRoot)scripts\whisper_venv.requirements.txt" DestinationFolder="$(OutputPath)"/>
-    </Target>
-
-    <Target Name="CopyTorchInstaller" AfterTargets="Build">
-        <Copy SourceFiles="$(RepoRoot)scripts\install_torch_cuda.py" DestinationFolder="$(OutputPath)"/>
+    <Target Name="CopyFunasrRequirements" AfterTargets="Build">
+        <Copy SourceFiles="$(RepoRoot)scripts\funasr_venv.requirements.txt" DestinationFolder="$(OutputPath)"/>
     </Target>
 
 </Project>

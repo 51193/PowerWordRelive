@@ -10,7 +10,6 @@ internal record TranscribeOptions(
     string CacheRoot,
     string Model,
     string Device,
-    string InitialPrompt,
     int PollIntervalSec,
     IFileSystem Fs
 );

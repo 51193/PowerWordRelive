@@ -13,9 +13,8 @@ var generalConfig = config.GetValueOrDefault("general", new Dictionary<string, s
 var workRoot = generalConfig.GetValueOrDefault("work_root", "");
 var inputDir = trConfig.GetValueOrDefault("input_dir", "./speaker_segments");
 var outputDir = trConfig.GetValueOrDefault("output_dir", "./transcriptions");
-var model = trConfig.GetValueOrDefault("model", "turbo");
+var model = trConfig.GetValueOrDefault("model", "paraformer-zh");
 var device = trConfig.GetValueOrDefault("device", "cuda");
-var initialPrompt = trConfig.GetValueOrDefault("initial_prompt", "以下是普通话");
 int.TryParse(trConfig.GetValueOrDefault("poll_interval_sec", "1"), out var pollIntervalSec);
 
 if (!string.IsNullOrEmpty(workRoot) && Path.IsPathRooted(workRoot))
@@ -36,8 +35,8 @@ var cacheRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "c
 fs.CreateDirectory(inputDir);
 fs.CreateDirectory(outputDir);
 
-var pythonPath = Path.Combine(AppContext.BaseDirectory, "whisper_venv", "bin", "python3");
-var pythonScriptPath = Path.Combine(AppContext.BaseDirectory, "whisper_server.py");
+var pythonPath = Path.Combine(AppContext.BaseDirectory, "funasr_venv", "bin", "python3");
+var pythonScriptPath = Path.Combine(AppContext.BaseDirectory, "funasr_server.py");
 
 if (!fs.FileExists(pythonPath))
 {
@@ -58,7 +57,7 @@ LogRedirector.Info("PowerWordRelive.Transcribe", "Transcribe starting",
 
 var process = new TranscribeProcess(new TranscribeOptions(
     inputDir, outputDir, pythonScriptPath, pythonPath, cacheRoot,
-    model, device, initialPrompt, pollIntervalSec, fs));
+    model, device, pollIntervalSec, fs));
 
 using var cts = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) =>
