@@ -33,4 +33,7 @@ PosixSignalRegistration.Create(
         manager.KillAll();
     });
 
-await manager.WaitAllAsync(cts.Token);
+await manager.WaitAllAsync(CancellationToken.None);
+
+LogRedirector.Info("PowerWordRelive.Host", "Host exiting");
+Console.Out.Flush();

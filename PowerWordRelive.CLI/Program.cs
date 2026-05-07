@@ -31,15 +31,53 @@ using var process = Process.Start(psi)!;
 Console.CancelKeyPress += (_, e) =>
 {
     e.Cancel = true;
-    if (!process.HasExited)
-        process.Kill();
+    ShutdownHost(process);
 };
 
 PosixSignalRegistration.Create(PosixSignal.SIGTERM, _ =>
 {
-    if (!process.HasExited)
-        process.Kill();
+    ShutdownHost(process);
 });
+
+static void ShutdownHost(Process hostProcess)
+{
+    if (hostProcess.HasExited)
+        return;
+
+    try
+    {
+        using var sigterm = Process.Start(new ProcessStartInfo
+        {
+            FileName = "kill",
+            Arguments = $"-TERM {hostProcess.Id}",
+            UseShellExecute = false,
+            CreateNoWindow = true
+        });
+        sigterm?.WaitForExit(1000);
+    }
+    catch
+    {
+    }
+
+    try
+    {
+        hostProcess.WaitForExit(30000);
+    }
+    catch
+    {
+    }
+
+    if (hostProcess.HasExited)
+        return;
+
+    try
+    {
+        hostProcess.Kill(true);
+    }
+    catch
+    {
+    }
+}
 
 var stdoutTask = Task.Run(async () =>
 {

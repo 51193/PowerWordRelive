@@ -5,11 +5,13 @@
 processes.audio_capture: PowerWordRelive.AudioCapture
 processes.speaker_split: PowerWordRelive.SpeakerSplit
 processes.transcribe: PowerWordRelive.Transcribe
+processes.transcription_store: PowerWordRelive.TranscriptionStore
 
 # 传递给各进程的配置域
 process_config.audio_capture.domains: audio_capture,general
 process_config.speaker_split.domains: speaker_split,general,huggingface
 process_config.transcribe.domains: transcribe,general
+process_config.transcription_store.domains: transcription_store,storage,general
 
 # 通用配置 — work_root 必须是绝对路径
 general.work_root: /absolute/path/to/work/root
@@ -40,6 +42,13 @@ transcribe.model: turbo
 transcribe.device: cuda
 transcribe.initial_prompt: 简体中文
 transcribe.poll_interval_sec: 1
+
+# 转录入库
+transcription_store.input_dir: ./transcriptions
+transcription_store.poll_interval_sec: 1
+
+# 持久化存储（SQLite）
+storage.sqlite_path: ./data/pwr.db
 
 # HuggingFace 令牌
 huggingface.token: hf_your_huggingface_token_here

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using PowerWordRelive.Host.Models;
 using PowerWordRelive.Infrastructure.Logging;
 using PowerWordRelive.Infrastructure.Storage;
@@ -52,18 +53,16 @@ internal class ProcessManager
 
     public async Task WaitAllAsync(CancellationToken ct = default)
     {
-        var tasks = _spawned.Select(async spawned =>
+        var exitTasks = _spawned.Select(async spawned =>
         {
             try
             {
                 await spawned.SystemProcess.WaitForExitAsync(ct);
 
                 var exitCode = spawned.SystemProcess.ExitCode;
-                var info = $"Child process {spawned.SystemProcess.StartInfo.Arguments} exited with code {exitCode}";
-                if (exitCode == 0)
-                    LogRedirector.Info("PowerWordRelive.Host", info);
-                else
-                    LogRedirector.Warn("PowerWordRelive.Host", info);
+                LogRedirector.Info("PowerWordRelive.Host",
+                    $"Child process {spawned.ProcessName} exited with code {exitCode}",
+                    new { process = spawned.ProcessName, exitCode });
             }
             catch (OperationCanceledException)
             {
@@ -75,14 +74,18 @@ internal class ProcessManager
             }
         });
 
-        await Task.WhenAll(tasks);
+        await Task.WhenAll(exitTasks);
+
+        await Task.WhenAll(_spawned.Select(s => s.StdoutTask));
+        await Task.WhenAll(_spawned.Select(s => s.StderrTask));
 
         LogRedirector.Info("PowerWordRelive.Host", "All child processes exited, shutting down");
     }
 
     public void KillAll()
     {
-        LogRedirector.Info("PowerWordRelive.Host", "Killing all child processes", new { count = _spawned.Count });
+        LogRedirector.Info("PowerWordRelive.Host", "Sending termination signal to all child processes",
+            new { count = _spawned.Count });
 
         foreach (var spawned in _spawned)
         {
@@ -93,30 +96,60 @@ internal class ProcessManager
             {
                 if (spawned.SystemProcess.HasExited)
                 {
-                    LogRedirector.Info("PowerWordRelive.Host", "Child process already exited before kill",
+                    LogRedirector.Info("PowerWordRelive.Host", "Child process already exited before termination",
                         new { process = name, pid, exitCode = spawned.SystemProcess.ExitCode });
                     continue;
                 }
 
-                LogRedirector.Info("PowerWordRelive.Host", "Killing child process",
+                LogRedirector.Info("PowerWordRelive.Host", "Sending SIGTERM to child process",
+                    new { process = name, pid });
+
+                SendSigterm(pid);
+                spawned.SystemProcess.WaitForExit(5000);
+
+                if (spawned.SystemProcess.HasExited)
+                {
+                    LogRedirector.Info("PowerWordRelive.Host", "Child process exited after SIGTERM",
+                        new { process = name, pid, exitCode = spawned.SystemProcess.ExitCode });
+                    continue;
+                }
+
+                LogRedirector.Warn("PowerWordRelive.Host", "Child process did not exit, sending SIGKILL",
                     new { process = name, pid });
 
                 spawned.SystemProcess.Kill(true);
-
                 spawned.SystemProcess.WaitForExit(3000);
 
                 if (spawned.SystemProcess.HasExited)
-                    LogRedirector.Info("PowerWordRelive.Host", "Child process killed",
+                    LogRedirector.Info("PowerWordRelive.Host", "Child process killed by SIGKILL",
                         new { process = name, pid });
                 else
-                    LogRedirector.Warn("PowerWordRelive.Host", "Child process still alive after kill",
+                    LogRedirector.Warn("PowerWordRelive.Host", "Child process still alive after SIGKILL",
                         new { process = name, pid });
             }
             catch (Exception ex)
             {
-                LogRedirector.Error("PowerWordRelive.Host", "Error killing child process",
+                LogRedirector.Error("PowerWordRelive.Host", "Error terminating child process",
                     new { process = name, pid, error = ex.Message });
             }
+        }
+    }
+
+    private static void SendSigterm(int pid)
+    {
+        try
+        {
+            using var sigterm = System.Diagnostics.Process.Start(new ProcessStartInfo
+            {
+                FileName = "kill",
+                Arguments = $"-TERM {pid}",
+                UseShellExecute = false,
+                CreateNoWindow = true
+            });
+            sigterm?.WaitForExit(1000);
+        }
+        catch
+        {
         }
     }
 
