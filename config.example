@@ -6,12 +6,14 @@ processes.audio_capture: PowerWordRelive.AudioCapture
 processes.speaker_split: PowerWordRelive.SpeakerSplit
 processes.transcribe: PowerWordRelive.Transcribe
 processes.transcription_store: PowerWordRelive.TranscriptionStore
+processes.llm_requester: PowerWordRelive.LLMRequester
 
 # 传递给各进程的配置域
 process_config.audio_capture.domains: audio_capture,general
 process_config.speaker_split.domains: speaker_split,general,huggingface
 process_config.transcribe.domains: transcribe,general
 process_config.transcription_store.domains: transcription_store,storage,general
+process_config.llm_requester.domains: llm_request,llm,general
 
 # 通用配置 — work_root 必须是绝对路径
 general.work_root: /absolute/path/to/work/root
@@ -45,6 +47,13 @@ transcribe.poll_interval_sec: 1
 # 转录入库
 transcription_store.input_dir: ./transcriptions
 transcription_store.poll_interval_sec: 1
+
+# LLM API
+llm.token: sk-your_token_here
+
+# LLM 请求定时器（秒），key 与 RequestRegistry 中的硬编码映射对应
+llm_request.timer.health_check: 300
+llm_request.timer.summary: 600
 
 # 持久化存储（SQLite）
 storage.sqlite_path: ./data/pwr.db
