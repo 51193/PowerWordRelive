@@ -1,17 +1,17 @@
 <Project>
     <PropertyGroup>
         <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
-        <OutputPath>$(RepoRoot)out/$(MSBuildProjectName)/</OutputPath>
+        <OutputPath Condition="!$(MSBuildProjectName.EndsWith('Tests'))">$(RepoRoot)out/$(MSBuildProjectName)/</OutputPath>
         <CommonOutputDir>$(RepoRoot)out/</CommonOutputDir>
-        <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-        <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+        <AppendTargetFrameworkToOutputPath Condition="!$(MSBuildProjectName.EndsWith('Tests'))">false</AppendTargetFrameworkToOutputPath>
+        <AppendRuntimeIdentifierToOutputPath Condition="!$(MSBuildProjectName.EndsWith('Tests'))">false</AppendRuntimeIdentifierToOutputPath>
     </PropertyGroup>
 
-    <Target Name="CopyConfig" AfterTargets="Build">
+    <Target Name="CopyConfig" AfterTargets="Build" Condition="!$(MSBuildProjectName.EndsWith('Tests'))">
         <Copy SourceFiles="$(RepoRoot)config" DestinationFolder="$(CommonOutputDir)"/>
     </Target>
 
-    <Target Name="CopySetupScript" AfterTargets="Build">
+    <Target Name="CopySetupScript" AfterTargets="Build" Condition="!$(MSBuildProjectName.EndsWith('Tests'))">
         <Copy SourceFiles="$(RepoRoot)scripts/setup.sh" DestinationFolder="$(CommonOutputDir)"/>
     </Target>
 </Project>

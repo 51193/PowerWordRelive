@@ -1,0 +1,7 @@
+<Project>
+    <PropertyGroup>
+        <OutputPath Condition="'$(IsTestProject)' == 'true'">$(MSBuildProjectDirectory)\bin\</OutputPath>
+        <AppendTargetFrameworkToOutputPath Condition="'$(IsTestProject)' == 'true'">true</AppendTargetFrameworkToOutputPath>
+        <AppendRuntimeIdentifierToOutputPath Condition="'$(IsTestProject)' == 'true'">true</AppendRuntimeIdentifierToOutputPath>
+    </PropertyGroup>
+</Project>
