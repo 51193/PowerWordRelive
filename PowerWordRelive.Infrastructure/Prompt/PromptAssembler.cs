@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.RegularExpressions;
 using PowerWordRelive.Infrastructure.Storage;
 
@@ -48,6 +49,34 @@ public class PromptAssembler
                         $"Empty dir path in template: {relativePath}");
 
                 return AssembleInternal(dirPath, variables, depth + 1);
+            }
+
+            // Only .md files are loaded to avoid binary files,
+            // editor temp files, or other non-text artifacts.
+            if (inner.StartsWith("folder:"))
+            {
+                var folderRel = inner["folder:".Length..].Trim();
+                if (string.IsNullOrWhiteSpace(folderRel))
+                    throw new InvalidPromptException(
+                        $"Empty folder path in template: {relativePath}");
+
+                var folderPath = Path.GetFullPath(Path.Combine(_promptBaseDir, folderRel));
+
+                if (!_fs.DirectoryExists(folderPath))
+                    throw new InvalidPromptException(
+                        $"Folder not found: {folderPath}");
+
+                var files = _fs.GetFiles(folderPath, "*.md");
+                Array.Sort(files);
+
+                var sb = new StringBuilder();
+                foreach (var file in files)
+                {
+                    var text = _fs.ReadAllText(file).TrimEnd();
+                    sb.AppendLine(text);
+                }
+
+                return sb.ToString();
             }
 
             if (inner.StartsWith("value:"))

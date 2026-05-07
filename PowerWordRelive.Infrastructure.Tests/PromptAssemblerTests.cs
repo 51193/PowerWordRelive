@@ -303,4 +303,61 @@ public class PromptAssemblerTests
 
         Assert.Contains("recursion depth", ex.Message.ToLowerInvariant());
     }
+
+    [Fact]
+    public void FolderInclusion_LoadsAllMdFilesSorted()
+    {
+        var fs = new InMemoryFileSystem();
+        fs.AddDirectory("/prompts/cards");
+        fs.AddFile("/prompts/cards/b.md", "b content");
+        fs.AddFile("/prompts/cards/a.md", "a content");
+        fs.AddFile("/prompts/cards/c.notmd", "should not load");
+        fs.AddFile("/prompts/main.md", "{{folder:cards}}");
+        var assembler = new PromptAssembler(fs, BaseDir);
+        var vars = new Dictionary<string, string>();
+
+        var result = assembler.Assemble("main.md", vars);
+
+        Assert.Equal("a content\nb content\n", result);
+    }
+
+    [Fact]
+    public void FolderInclusion_EmptyFolder()
+    {
+        var fs = new InMemoryFileSystem();
+        fs.AddDirectory("/prompts/empty");
+        fs.AddFile("/prompts/main.md", "[{{folder:empty}}]");
+        var assembler = new PromptAssembler(fs, BaseDir);
+        var vars = new Dictionary<string, string>();
+
+        var result = assembler.Assemble("main.md", vars);
+
+        Assert.Equal("[]", result);
+    }
+
+    [Fact]
+    public void FolderInclusion_FolderNotFound()
+    {
+        var fs = new InMemoryFileSystem();
+        fs.AddFile("/prompts/main.md", "{{folder:nonexistent}}");
+        var assembler = new PromptAssembler(fs, BaseDir);
+        var vars = new Dictionary<string, string>();
+
+        Assert.Throws<InvalidPromptException>(() =>
+            assembler.Assemble("main.md", vars));
+    }
+
+    [Fact]
+    public void FolderInclusion_EmptyPath()
+    {
+        var fs = new InMemoryFileSystem();
+        fs.AddFile("/prompts/main.md", "{{folder: }}");
+        var assembler = new PromptAssembler(fs, BaseDir);
+        var vars = new Dictionary<string, string>();
+
+        var ex = Assert.Throws<InvalidPromptException>(() =>
+            assembler.Assemble("main.md", vars));
+
+        Assert.Contains("empty", ex.Message.ToLowerInvariant());
+    }
 }

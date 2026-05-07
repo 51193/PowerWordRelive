@@ -13,8 +13,14 @@ public sealed class InMemoryFileSystem : IFileSystem
     public bool FileExists(string path) => _files.ContainsKey(path);
     public bool DirectoryExists(string path) => _directories.Contains(path);
     public void CreateDirectory(string path) => _directories.Add(path);
-    public string[] GetFiles(string path, string pattern) =>
-        _files.Keys.Where(k => k.StartsWith(path)).ToArray();
+
+    public string[] GetFiles(string path, string pattern)
+    {
+        var extension = pattern.TrimStart('*');
+        return _files.Keys
+            .Where(k => k.StartsWith(path) && k.EndsWith(extension))
+            .ToArray();
+    }
     public void MoveFile(string source, string destination) { }
     public void DeleteFile(string path) => _files.Remove(path);
     public string[] ReadAllLines(string path) =>

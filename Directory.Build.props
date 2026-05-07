@@ -14,4 +14,11 @@
     <Target Name="CopySetupScript" AfterTargets="Build" Condition="!$(MSBuildProjectName.EndsWith('Tests'))">
         <Copy SourceFiles="$(RepoRoot)scripts/setup.sh" DestinationFolder="$(CommonOutputDir)"/>
     </Target>
+
+    <Target Name="CopyPrompts" AfterTargets="Build" Condition="!$(MSBuildProjectName.EndsWith('Tests'))">
+        <ItemGroup>
+            <PromptFiles Include="$(RepoRoot)text_data/**/*"/>
+        </ItemGroup>
+        <Copy SourceFiles="@(PromptFiles)" DestinationFolder="$(CommonOutputDir)text_data/%(RecursiveDir)"/>
+    </Target>
 </Project>

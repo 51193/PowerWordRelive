@@ -13,7 +13,7 @@ process_config.audio_capture.domains: audio_capture,general
 process_config.speaker_split.domains: speaker_split,general,huggingface
 process_config.transcribe.domains: transcribe,general
 process_config.transcription_store.domains: transcription_store,storage,general
-process_config.llm_requester.domains: llm_request,llm,general
+process_config.llm_requester.domains: llm_request,llm,general,storage,text_data
 
 # 通用配置 — work_root 必须是绝对路径
 general.work_root: /absolute/path/to/work/root
@@ -50,16 +50,21 @@ transcription_store.poll_interval_sec: 1
 
 # LLM API
 llm.token: sk-your_token_here
+llm.api_url: https://api.deepseek.com/v1/chat/completions
 
-# LLM 请求定时器（秒），key 与 RequestRegistry 中的硬编码映射对应
-llm_request.timer.health_check: 300
-llm_request.timer.summary: 600
+# Speaker ID 推断定时器（秒）
+llm_request.timer.speaker_identification: 300
+
+# Speaker ID 推断请求参数
+llm_request.speaker_identification.model: deepseek-v4-pro
+llm_request.speaker_identification.thinking_enabled: true
+llm_request.speaker_identification.reasoning_effort: high
 
 # 持久化存储（SQLite）
 storage.sqlite_path: ./data/pwr.db
 
-# 提示词模板
-prompt.prompt_base_dir: prompts/
+# 文本资料
+text_data.base_dir: text_data/
 
 # HuggingFace 令牌
 huggingface.token: hf_your_huggingface_token_here
