@@ -19,7 +19,7 @@ general.work_root: /absolute/path/to/work/root
 # 音频捕获
 audio_capture.output_dir: ./segments
 audio_capture.sample_rate: 16000
-audio_capture.silence_timeout_ms: 300
+audio_capture.silence_timeout_ms: 800
 audio_capture.max_segment_sec: 120
 audio_capture.no_speech_timeout_sec: 30
 audio_capture.min_speech_ms: 500
@@ -40,7 +40,7 @@ transcribe.input_dir: ./speaker_segments
 transcribe.output_dir: ./transcriptions
 transcribe.model: turbo
 transcribe.device: cuda
-transcribe.initial_prompt: 简体中文
+transcribe.initial_prompt: 以下是普通话
 transcribe.poll_interval_sec: 1
 
 # 转录入库

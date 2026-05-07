@@ -37,6 +37,23 @@ internal class TranscriptionDatabase : IDisposable
         cmd.CommandText =
             "CREATE INDEX IF NOT EXISTS idx_transcriptions_start_time ON transcriptions(start_timestamp_ms)";
         cmd.ExecuteNonQuery();
+
+        cmd.CommandText = """
+                              CREATE TABLE IF NOT EXISTS speaker_mappings (
+                                  speaker_id TEXT PRIMARY KEY NOT NULL,
+                                  role_name  TEXT NOT NULL
+                              );
+                          """;
+        cmd.ExecuteNonQuery();
+    }
+
+    public void EnsureSpeakerExists(string speakerId)
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = "INSERT OR IGNORE INTO speaker_mappings (speaker_id, role_name) VALUES (@speaker, @role)";
+        cmd.Parameters.AddWithValue("@speaker", speakerId);
+        cmd.Parameters.AddWithValue("@role", "__UNASSIGNED__");
+        cmd.ExecuteNonQuery();
     }
 
     public void Insert(IReadOnlyList<TranscriptionEntry> entries)

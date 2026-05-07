@@ -15,7 +15,7 @@ var inputDir = trConfig.GetValueOrDefault("input_dir", "./speaker_segments");
 var outputDir = trConfig.GetValueOrDefault("output_dir", "./transcriptions");
 var model = trConfig.GetValueOrDefault("model", "turbo");
 var device = trConfig.GetValueOrDefault("device", "cuda");
-var initialPrompt = trConfig.GetValueOrDefault("initial_prompt", "简体中文");
+var initialPrompt = trConfig.GetValueOrDefault("initial_prompt", "以下是普通话");
 int.TryParse(trConfig.GetValueOrDefault("poll_interval_sec", "1"), out var pollIntervalSec);
 
 if (!string.IsNullOrEmpty(workRoot) && Path.IsPathRooted(workRoot))

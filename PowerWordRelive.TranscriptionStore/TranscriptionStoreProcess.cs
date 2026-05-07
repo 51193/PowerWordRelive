@@ -75,6 +75,9 @@ internal class TranscriptionStoreProcess
         {
             var lines = _opt.Fs.ReadAllLines(processingPath);
             var parsed = FilenameParser.Parse(fileName);
+
+            db.EnsureSpeakerExists(parsed.SpeakerId);
+
             var subtitles = SrtParser.Parse(lines);
 
             var entries = new List<TranscriptionEntry>(subtitles.Count);

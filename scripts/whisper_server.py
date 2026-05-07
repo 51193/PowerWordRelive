@@ -35,7 +35,7 @@ def run_server():
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--model", default="turbo")
     parser.add_argument("--device", default="cuda")
-    parser.add_argument("--initial-prompt", default="简体中文")
+    parser.add_argument("--initial-prompt", default="以下是普通话")
     args = parser.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
@@ -71,6 +71,10 @@ def run_server():
                     input_path,
                     language="zh",
                     initial_prompt=args.initial_prompt,
+                    condition_on_previous_text=False,
+                    compression_ratio_threshold=2.4,
+                    logprob_threshold=-1.0,
+                    no_speech_threshold=0.6,
                     verbose=False,
                 )
             finally:
