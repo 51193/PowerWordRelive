@@ -234,4 +234,109 @@ public class RefinementContainerTests : IDisposable
         var entries = _db.GetRefinementWindow(10);
         Assert.Single(entries);
     }
+
+    [Fact]
+    public void Remove_OutOfRange_Noop()
+    {
+        _container.Add("S0：c0");
+        _container.Get(1);
+
+        _container.Remove(5);
+
+        Assert.Single(_db.GetRefinementWindow(10));
+    }
+
+    [Fact]
+    public void Edit_OutOfRange_Noop()
+    {
+        _container.Add("S0：old");
+        _container.Get(1);
+
+        _container.Edit(5, "S0：new");
+
+        Assert.Equal("old", _db.GetRefinementWindow(10)[0].Content);
+    }
+
+    [Fact]
+    public void Get_Zero_ReturnsEmpty()
+    {
+        _container.Add("S0：c0");
+        Assert.Empty(_container.Get(0));
+    }
+
+    [Fact]
+    public void Insert_SingleEntryWindow_WrapsCorrectly()
+    {
+        _container.Add("S0：c0"); // 1.0
+        _container.Add("S1：c1"); // 2.0
+        _container.Add("S2：c2"); // 3.0
+        _container.Get(1); // ids [3.0]
+
+        _container.Add(1, "after"); // insert after display 1 → 4.0
+
+        var entries = _db.GetRefinementWindow(10);
+        Assert.Equal(4, entries.Count);
+        Assert.Equal(4.0, entries[3].Id);
+    }
+
+    [Fact]
+    public void Insert_WithinWindowWithMoreInDb_MidpointInWindow()
+    {
+        // DB has 5 entries, window 2 → LLM sees entries 4,5 as display 1,2
+        _container.Add("S0：c0"); // 1.0
+        _container.Add("S1：c1"); // 2.0
+        _container.Add("S2：c2"); // 3.0
+        _container.Add("S3：c3"); // 4.0
+        _container.Add("S4：c4"); // 5.0
+        _container.Get(2); // ids [4.0, 5.0]
+
+        _container.Add(1, "inserted"); // insert after display 1 → between 4.0 and 5.0 → 4.5
+
+        var entries = _db.GetRefinementWindow(10);
+        Assert.Equal(6, entries.Count);
+        Assert.Equal(4.0, entries[3].Id);
+        Assert.Equal(4.5, entries[4].Id);
+        Assert.Equal(5.0, entries[5].Id);
+    }
+
+    [Fact]
+    public void Append_WhenIdsEmptyButDbHasEntries_UsesDbMax()
+    {
+        _container.Add("S0：c0"); // id 1.0
+        _container.Add("S1：c1"); // id 2.0
+
+        // Create a fresh container that loads from DB without prior Add calls
+        var fresh = new RefinementContainer(_db);
+        fresh.Get(0); // ids=[] after Get(0)
+
+        fresh.Add("new"); // ids empty → db.GetMaxRefinementId() → 2.0 + 1 = 3.0
+
+        var entries = _db.GetRefinementWindow(10);
+        Assert.Equal(3, entries.Count);
+        Assert.Equal(3.0, entries[2].Id);
+    }
+
+    [Fact]
+    public void AllOperations_InOneBatch_ReferenceSameSnapshot()
+    {
+        _container.Add("S0：c0"); // 1.0
+        _container.Add("S1：c1"); // 2.0
+        _container.Add("S2：c2"); // 3.0
+        _container.Add("S3：c3"); // 4.0
+        _container.Get(3); // ids [2.0, 3.0, 4.0], display 1→2.0, 2→3.0, 3→4.0
+
+        _container.Edit(2, "S1：updated"); // ids[1] = 3.0 → UPDATE 3.0
+        _container.Remove(1); // ids[0] = 2.0 → DELETE 2.0
+        _container.Add("S4：appended"); // ids[^1] = 4.0 → 5.0
+        _container.Add(2, "SX：inserted"); // ids[1]=3.0, ids[2]=4.0 → 3.5
+
+        var entries = _db.GetRefinementWindow(10);
+        Assert.Equal(5, entries.Count);
+        var byId = entries.ToDictionary(e => e.Id);
+        Assert.Equal("c0", byId[1.0].Content);
+        Assert.Equal("updated", byId[3.0].Content);
+        Assert.Equal("inserted", byId[3.5].Content);
+        Assert.Equal("c3", byId[4.0].Content);
+        Assert.Equal("appended", byId[5.0].Content);
+    }
 }
