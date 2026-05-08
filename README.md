@@ -1,6 +1,24 @@
 # Power Word Relive
 
-实时捕获系统音频，将连续语音切分为按说话人分离的音频片段，为桌面 TRPG 场景提供离线的对话结构化能力。
+实时捕获系统音频，将连续语音切分为按说话人分离的音频片段，转录为文本并入库，通过 LLM 进行说话人识别和对话精炼，最终通过远端 Web 前端查询精炼结果。
+
+## 架构
+
+```
+CLI (PowerWordRelive.CLI)
+  └── Host (PowerWordRelive.Host)
+        ├── AudioCapture ─────── 音频捕获 + VAD 切分
+        ├── SpeakerSplit ─────── 说话人分离
+        ├── Transcribe ───────── 语音转录 (ASR)
+        ├── TranscriptionStore ── SRT 入库 (SQLite)
+        ├── LLMRequester ─────── 说话人识别 + 对话精炼 (LLM)
+        └── LocalBackend ─────── 远端查询后端 (只读 DB)
+
+RemoteBackend (独立运行, ASP.NET Core)
+  ├── WebSocket (/ws/backend) ── 接受 LocalBackend 连接 (AES 认证)
+  ├── WebSocket (/ws/frontend) ─ 接受浏览器连接
+  └── wwwroot/ ───────────────── 静态前端页面
+```
 
 ## 核心能力
 
@@ -15,17 +33,31 @@
 - **多人语句**：将每段切分后按说话人输出为 `时间戳+偏移量+SpeakerID.wav`
 - **跨会话识别**：说话人声纹持久化（`.npy` 文件），同一说话人在不同会话中可被识别为同一 ID
 
-### 3. 语音转录（Whisper Transcription）
+### 3. 语音转录（ASR）
 
 将说话人分离后的音频片段转录为字幕文本：
-- 使用 OpenAI Whisper 模型（默认 `turbo`，可配置）
+- 使用 FunASR Paraformer 模型
 - 以长驻服务方式运行，模型只加载一次
 - 输出为 SRT 字幕格式，与原输入文件名对应（1:1）
-- 支持 CUDA 加速，模型可配置
+- 支持 CUDA 加速
 
-### 4. 按时间戳顺序输出
+### 4. 转录入库（TranscriptionStore）
 
-所有处理严格按时间戳顺序进行，输出文件按时间排序，下游进程可无缝按序消费。
+将 SRT 字幕文件解析后写入 SQLite 数据库，建立 `transcriptions` 和 `speaker_mappings` 表。
+
+### 5. LLM 请求引擎（LLMRequester）
+
+通过定时器驱动，对数据库内容进行 LLM 增强：
+- **说话人识别**：将未确认的 speaker ID 发送给 LLM，根据角色卡和上下文推断角色名
+- **对话精炼**：将转录文本结合已有精炼结果窗，由 LLM 输出增删改操作，存储在 `refinement_results` 表中
+- 精炼表使用浮点主键，支持插入式排序
+
+### 6. 远端查询前端（RemoteBackend + LocalBackend）
+
+- **LocalBackend**：由 Host 拉起，通过 WebSocket 连接到 RemoteBackend，提供 SQLite 只读查询
+- **RemoteBackend**：独立 ASP.NET Core 服务，接受一条 LocalBackend 连接，将浏览器请求转发到 LocalBackend
+- 浏览器端展示精炼结果，支持微信聊天式消息面板、按角色过滤
+- 连接通过 AES-256 challenge-response 认证
 
 ## 快速开始
 
@@ -48,68 +80,139 @@ out/setup.sh
 
 ### 配置
 
-编辑 `config` 文件（首次使用请复制 `config.example` 并填充实际值）：
+复制并编辑 `config` 文件（首次使用从 `config.example` 复制）：
 
 ```ini
-# 进程定义
+# ── 进程定义 ──
 processes.audio_capture: PowerWordRelive.AudioCapture
 processes.speaker_split: PowerWordRelive.SpeakerSplit
 processes.transcribe: PowerWordRelive.Transcribe
+processes.transcription_store: PowerWordRelive.TranscriptionStore
+processes.llm_requester: PowerWordRelive.LLMRequester
+processes.local_backend: PowerWordRelive.LocalBackend
 
-# 可选启用的进程
+# ── 进程配置域 ──
 process_config.audio_capture.domains: audio_capture,general
 process_config.speaker_split.domains: speaker_split,general,huggingface
 process_config.transcribe.domains: transcribe,general
+process_config.transcription_store.domains: transcription_store,storage,general
+process_config.llm_requester.domains: llm_request,llm,general,storage,text_data
+process_config.local_backend.domains: local_backend,storage,general
 
-# 工作目录（所有输入输出路径相对于此）
-general.work_root: /path/to/work/root
+# ── 通用 ──
+general.work_root: /absolute/path/to/work/root
 
-# 音频捕获
+# ── 各模块配置 ──
 audio_capture.output_dir: ./segments
-audio_capture.silence_timeout_ms: 500
-
-# 说话人分离
 speaker_split.input_dir: ./segments
 speaker_split.output_dir: ./speaker_segments
-speaker_split.match_threshold: 0.55
-
-# Whisper 转录
 transcribe.input_dir: ./speaker_segments
 transcribe.output_dir: ./transcriptions
-transcribe.model: turbo
-transcribe.device: cuda
+transcription_store.input_dir: ./transcriptions
+storage.sqlite_path: ./data/pwr.db
 
-# HuggingFace Token（用于下载模型）
+# ── LLM ──
+llm.token: sk-your_token_here
+llm.api_url: https://api.deepseek.com/v1/chat/completions
+llm_request.timer.45: speaker_identification,refinement
+llm_request.speaker_identification.model: deepseek-v4-pro
+llm_request.refinement.model: deepseek-v4-flash
+
+# ── HuggingFace Token ──
 huggingface.token: hf_your_token_here
+
+# ── 本地后端 (连接远端后端) ──
+local_backend.remote_host: 127.0.0.1
+local_backend.remote_port: 9500
+local_backend.key_path: ./keys/local_backend.key
+local_backend.max_reconnect_attempts: 5
+local_backend.initial_reconnect_delay_sec: 2
+
+# ── 远端后端 (独立运行) ──
+remote_backend.port: 9500
+remote_backend.key_path: /etc/pwr/remote_backend.key
 ```
 
 ### 运行
 
 ```bash
+# 本地启动全部进程
 out/PowerWordRelive.CLI/PowerWordRelive.CLI
 ```
 
-CLI 会自动启动所有已配置的进程。进程会根据配置监听对应的输入目录，实时捕获并处理音频。
+使用 `Ctrl+C` 优雅退出，所有子进程会被自动清理。
 
-使用 `Ctrl+C` 优雅退出。所有子进程会被自动清理。
+## 远端前端部署
+
+RemoteBackend 是一个独立的 ASP.NET Core 服务，部署在远端服务器上，不在 Host 的管理范围内。
+
+### 1. 生成加密密钥
+
+```bash
+bash scripts/generate_key.sh
+```
+
+### 2. 部署密钥
+
+将生成的密钥分别放置到两端：
+
+```bash
+# 远端服务器 — 固定路径
+mkdir -p /etc/pwr
+echo "<生成的密钥>" > /etc/pwr/remote_backend.key
+chmod 600 /etc/pwr/remote_backend.key
+
+# 本地机器 — 路径由 config 中的 local_backend.key_path 指定
+mkdir -p ./keys
+echo "<生成的密钥>" > ./keys/local_backend.key
+```
+
+### 3. 远端服务器：配置并启动 RemoteBackend
+
+在 `out/PowerWordRelive.RemoteBackend/` 下放置 `config` 文件：
+
+```ini
+remote_backend.port: 9500
+remote_backend.key_path: /etc/pwr/remote_backend.key
+```
+
+启动：
+
+```bash
+cd out/PowerWordRelive.RemoteBackend
+dotnet PowerWordRelive.RemoteBackend.dll
+```
+
+### 4. 本地：配置 LocalBackend 并启动 Host
+
+确保 `config` 中 `local_backend.*` 配置项指向正确的远端地址和密钥路径，然后：
+
+```bash
+out/PowerWordRelive.CLI/PowerWordRelive.CLI
+```
+
+### 5. 访问前端
+
+浏览器打开 `http://<remote_host>:<remote_backend.port>`
 
 ## 输出结构
 
 ```
 <work_root>/
 ├── segments/                     # VAD 切分的语句片段
-│   ├── 20260506_120000_000000.wav
-│   └── ...
+│   └── 20260506_120000_000000.wav
 ├── speaker_segments/             # 说话人分离后的音频
 │   ├── 20260506_120000_000000+speaker_0.wav
-│   ├── 20260506_120000_000000+00000+speaker_1.wav
-│   └── ...
+│   └── 20260506_120000_000000+00000+speaker_1.wav
 ├── speaker_embeddings/           # 持久化声纹
-│   ├── speaker_0.npy
-│   └── ...
-└── transcriptions/               # Whisper 转录字幕
-    ├── 20260506_120000_000000+speaker_0.srt
-    └── ...
+│   └── speaker_0.npy
+├── transcriptions/               # ASR 转录字幕 (SRT)
+│   └── 20260506_120000_000000+speaker_0.srt
+└── data/
+    └── pwr.db                    # SQLite 数据库
+        ├── transcriptions        # 转录条目
+        ├── speaker_mappings      # 说话人 → 角色名映射
+        └── refinement_results    # LLM 精炼对话
 ```
 
 ## 性能

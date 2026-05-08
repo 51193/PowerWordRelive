@@ -7,6 +7,7 @@ processes.speaker_split: PowerWordRelive.SpeakerSplit
 processes.transcribe: PowerWordRelive.Transcribe
 processes.transcription_store: PowerWordRelive.TranscriptionStore
 processes.llm_requester: PowerWordRelive.LLMRequester
+processes.local_backend: PowerWordRelive.LocalBackend
 
 # 传递给各进程的配置域
 process_config.audio_capture.domains: audio_capture,general
@@ -14,6 +15,7 @@ process_config.speaker_split.domains: speaker_split,general,huggingface
 process_config.transcribe.domains: transcribe,general
 process_config.transcription_store.domains: transcription_store,storage,general
 process_config.llm_requester.domains: llm_request,llm,general,storage,text_data
+process_config.local_backend.domains: local_backend,storage,general
 
 # 通用配置 — work_root 必须是绝对路径
 general.work_root: /absolute/path/to/work/root
@@ -73,6 +75,17 @@ storage.sqlite_path: ./data/pwr.db
 
 # 文本资料
 text_data.base_dir: text_data/
+
+# 本地后端（连接远端后端）
+local_backend.remote_host: 127.0.0.1
+local_backend.remote_port: 9500
+local_backend.key_path: ./keys/local_backend.key
+local_backend.max_reconnect_attempts: 5
+local_backend.initial_reconnect_delay_sec: 2
+
+# 远端后端（独立运行，不在 Host 管理下）
+remote_backend.port: 9500
+remote_backend.key_path: /etc/pwr/remote_backend.key
 
 # HuggingFace 令牌
 huggingface.token: hf_your_huggingface_token_here

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>PowerWordRelive</title>
+    <link href="style.css" rel="stylesheet">
+</head>
+<body>
+<div class="app">
+    <header class="header">
+        <h1>PowerWordRelive</h1>
+        <div class="status-bar">
+            <span class="status-dot disconnected" id="status-indicator"></span>
+            <span id="status-text">未连接</span>
+        </div>
+    </header>
+
+    <main class="main">
+        <aside class="chat-panel">
+            <div class="chat-header">
+                <select id="character-select">
+                    <option value="">全部角色</option>
+                </select>
+                <span class="msg-count" id="msg-count"></span>
+            </div>
+            <div class="chat-messages" id="chat-messages">
+                <div class="chat-placeholder">连接后端以加载消息</div>
+            </div>
+            <button class="scroll-bottom-btn" id="scroll-bottom" onclick="scrollToBottom()">↓ 底部</button>
+        </aside>
+
+        <section class="data-panel">
+            <div class="placeholder">右侧面板 — 待后续开发</div>
+        </section>
+    </main>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
