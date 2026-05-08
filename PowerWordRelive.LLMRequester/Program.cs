@@ -65,56 +65,44 @@ if (!fs.FileExists(sqlitePath))
         $"SQLite database not yet available: {sqlitePath}, will wait for producer");
 }
 
-var timerIntervals = new Dictionary<string, TimeSpan>();
-var requestConfigs = new Dictionary<string, LlmRequestConfig>();
+var timerIntervals = new Dictionary<TimeSpan, List<string>>();
 
 foreach (var (k, v) in llmRequestConfig)
 {
     if (k.StartsWith("timer."))
     {
-        var key = k["timer.".Length..];
-        if (!int.TryParse(v, out var sec) || sec <= 0)
+        var intervalStr = k["timer.".Length..];
+        if (!int.TryParse(intervalStr, out var sec) || sec <= 0)
         {
             LogRedirector.Warn("PowerWordRelive.LLMRequester",
-                $"Invalid timer interval for '{k}': {v}, skipping");
+                $"Invalid timer interval value '{intervalStr}' for '{k}', skipping");
             continue;
         }
 
-        timerIntervals[key] = TimeSpan.FromSeconds(sec);
+        var keys = v.Split(',',
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (keys.Length == 0)
+        {
+            LogRedirector.Warn("PowerWordRelive.LLMRequester",
+                $"No request keys in timer '{k}', skipping");
+            continue;
+        }
+
+        var interval = TimeSpan.FromSeconds(sec);
+        if (!timerIntervals.TryGetValue(interval, out var list))
+        {
+            list = new List<string>();
+            timerIntervals[interval] = list;
+        }
+
+        foreach (var key in keys)
+            list.Add(key);
     }
 }
 
-foreach (var key in timerIntervals.Keys)
-{
-    var model = llmRequestConfig.GetValueOrDefault($"{key}.model", "deepseek-v4-pro");
-    var thinkingStr = llmRequestConfig.GetValueOrDefault($"{key}.thinking_enabled", "false");
-    var reasoningStr = llmRequestConfig.GetValueOrDefault($"{key}.reasoning_effort", "high");
-    var contextWindowStr = llmRequestConfig.GetValueOrDefault($"{key}.context_window", "2");
-
-    var thinkingEnabled = thinkingStr.Equals("true", StringComparison.OrdinalIgnoreCase);
-
-    if (!bool.TryParse(thinkingStr, out var parsedThinking))
-        LogRedirector.Warn("PowerWordRelive.LLMRequester",
-            $"Invalid thinking_enabled for '{key}': {thinkingStr}, defaulting to false");
-    else
-        thinkingEnabled = parsedThinking;
-
-    var reasoningEffort = reasoningStr.ToLowerInvariant() switch
-    {
-        "low" or "medium" or "high" => "high",
-        "max" or "xhigh" => "max",
-        _ => "high"
-    };
-
-    if (!int.TryParse(contextWindowStr, out var contextWindow) || contextWindow < 0)
-    {
-        LogRedirector.Warn("PowerWordRelive.LLMRequester",
-            $"Invalid context_window for '{key}': {contextWindowStr}, defaulting to 2");
-        contextWindow = 2;
-    }
-
-    requestConfigs[key] = new LlmRequestConfig(model, thinkingEnabled, reasoningEffort, contextWindow);
-}
+var distinctKeys = timerIntervals.Values
+    .SelectMany(l => l).Distinct().ToList();
+var requestConfigs = LlmConfigParser.Parse(distinctKeys, llmRequestConfig);
 
 if (timerIntervals.Count == 0)
 {

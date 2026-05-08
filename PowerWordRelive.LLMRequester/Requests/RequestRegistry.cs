@@ -21,7 +21,7 @@ public static class RequestRegistry
             IRequest inner = key switch
             {
                 "speaker_identification" => new SpeakerIdentificationRequest(
-                    apiUrl, llmToken, db, assembler, config, apiClient),
+                    apiUrl, llmToken, db, assembler, (SpeakerIdentificationConfig)config, apiClient),
 
                 _ => throw new InvalidOperationException($"Unknown request key: {key}")
             };

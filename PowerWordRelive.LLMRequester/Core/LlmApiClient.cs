@@ -7,7 +7,7 @@ using PowerWordRelive.Infrastructure.Logging;
 
 namespace PowerWordRelive.LLMRequester.Core;
 
-public record LlmRequestConfig(string Model, bool ThinkingEnabled, string ReasoningEffort, int ContextWindow);
+public record LlmRequestConfig(string Model, bool ThinkingEnabled, string ReasoningEffort);
 
 public record LlmResponse(string Content, int OutputTokens, int CachedInputTokens, int MissInputTokens);
 

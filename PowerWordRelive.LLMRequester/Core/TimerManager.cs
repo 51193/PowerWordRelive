@@ -3,15 +3,15 @@ namespace PowerWordRelive.LLMRequester.Core;
 public static class TimerManager
 {
     public static List<Task> StartTimers(
-        Dictionary<string, TimeSpan> intervals,
+        Dictionary<TimeSpan, List<string>> intervals,
         ConcurrentRequestQueue queue,
         CancellationToken ct)
     {
         var tasks = new List<Task>();
 
-        foreach (var (key, interval) in intervals)
+        foreach (var (interval, keys) in intervals)
         {
-            var task = Task.Run(() => TimerLoop(key, interval, queue, ct), ct);
+            var task = Task.Run(() => TimerLoop(interval, keys, queue, ct), ct);
             tasks.Add(task);
         }
 
@@ -19,8 +19,8 @@ public static class TimerManager
     }
 
     private static async Task TimerLoop(
-        string key,
         TimeSpan interval,
+        List<string> keys,
         ConcurrentRequestQueue queue,
         CancellationToken ct)
     {
@@ -36,7 +36,8 @@ public static class TimerManager
             }
 
             if (!ct.IsCancellationRequested)
-                queue.Enqueue(key);
+                foreach (var key in keys)
+                    queue.Enqueue(key);
         }
     }
 }

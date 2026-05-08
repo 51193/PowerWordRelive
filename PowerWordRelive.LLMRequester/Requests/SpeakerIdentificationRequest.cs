@@ -21,7 +21,7 @@ internal class SpeakerIdentificationRequest : IRequest
     private readonly string _token;
     private readonly LLMDatabase _db;
     private readonly PromptAssembler _assembler;
-    private readonly LlmRequestConfig _config;
+    private readonly SpeakerIdentificationConfig _config;
     private readonly LlmApiClient _apiClient;
 
     public SpeakerIdentificationRequest(
@@ -29,7 +29,7 @@ internal class SpeakerIdentificationRequest : IRequest
         string token,
         LLMDatabase db,
         PromptAssembler assembler,
-        LlmRequestConfig config,
+        SpeakerIdentificationConfig config,
         LlmApiClient apiClient)
     {
         _apiUrl = apiUrl;

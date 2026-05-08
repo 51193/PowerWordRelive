@@ -52,8 +52,8 @@ transcription_store.poll_interval_sec: 1
 llm.token: sk-your_token_here
 llm.api_url: https://api.deepseek.com/v1/chat/completions
 
-# Speaker ID 推断定时器（秒）
-llm_request.timer.speaker_identification: 300
+# 定时器（格式：llm_request.timer.<秒数>: <逗号分隔的请求键列表>）
+llm_request.timer.30: speaker_identification
 
 # Speaker ID 推断请求参数
 llm_request.speaker_identification.model: deepseek-v4-pro
