@@ -9,8 +9,8 @@ namespace PowerWordRelive.LLMRequester.Requests;
 
 internal class SpeakerIdentificationRequest : IRequest
 {
-    private const string SystemPromptFile = "prompts/speaker_id_system.md";
-    private const string UserPromptFile = "prompts/speaker_id_user.md";
+    private const string SystemPromptFile = "prompts/speaker_id/speaker_id_system.md";
+    private const string UserPromptFile = "prompts/speaker_id/speaker_id_user.md";
     private const string UnknownMarker = "__UNKNOWN__";
     private const string ClusterSeparator = "\n---对话分割---\n";
     private const int MaxClustersBeforeSampling = 15;

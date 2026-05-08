@@ -23,6 +23,9 @@ public static class RequestRegistry
                 "speaker_identification" => new SpeakerIdentificationRequest(
                     apiUrl, llmToken, db, assembler, (SpeakerIdentificationConfig)config, apiClient),
 
+                "refinement" => CreateRefinementRequest(
+                    apiUrl, llmToken, db, assembler, (RefinementConfig)config, apiClient),
+
                 _ => throw new InvalidOperationException($"Unknown request key: {key}")
             };
 
@@ -30,5 +33,17 @@ public static class RequestRegistry
         }
 
         return registry;
+    }
+
+    private static RefinementRequest CreateRefinementRequest(
+        string apiUrl,
+        string llmToken,
+        LLMDatabase db,
+        PromptAssembler assembler,
+        RefinementConfig config,
+        LlmApiClient apiClient)
+    {
+        var container = new RefinementContainer(db);
+        return new RefinementRequest(apiUrl, llmToken, db, container, assembler, config, apiClient);
     }
 }

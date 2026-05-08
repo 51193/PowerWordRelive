@@ -14,6 +14,7 @@ public static class LlmConfigParser
             result[key] = key switch
             {
                 "speaker_identification" => ParseSpeakerIdentification(key, llmRequestConfig),
+                "refinement" => ParseRefinement(key, llmRequestConfig),
                 _ => throw new InvalidOperationException($"Unknown request key: {key}")
             };
         return result;
@@ -53,6 +54,29 @@ public static class LlmConfigParser
             "max" or "xhigh" => "max",
             _ => "high"
         };
+    }
+
+    private static RefinementConfig ParseRefinement(string key, Dictionary<string, string> cfg)
+    {
+        var model = ParseModel(key, cfg);
+        var thinkingEnabled = ParseThinkingEnabled(key, cfg);
+        var reasoningEffort = ParseReasoningEffort(key, cfg);
+        var dialogueWindow = ParseIntConfig(key, "dialogue_window", cfg, 30);
+        var refinementWindow = ParseIntConfig(key, "refinement_window", cfg, 20);
+        return new RefinementConfig(model, thinkingEnabled, reasoningEffort, dialogueWindow, refinementWindow);
+    }
+
+    private static int ParseIntConfig(string key, string subKey, Dictionary<string, string> cfg, int defaultValue)
+    {
+        var str = cfg.GetValueOrDefault($"{key}.{subKey}", defaultValue.ToString());
+        if (!int.TryParse(str, out var val) || val <= 0)
+        {
+            LogRedirector.Warn("PowerWordRelive.LLMRequester",
+                $"Invalid {subKey} for '{key}': {str}, defaulting to {defaultValue}");
+            val = defaultValue;
+        }
+
+        return val;
     }
 
     private static int ParseContextWindow(string key, Dictionary<string, string> cfg)
