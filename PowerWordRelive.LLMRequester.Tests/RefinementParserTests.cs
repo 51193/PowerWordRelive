@@ -27,7 +27,7 @@ public class RefinementParserTests
         var result = _parser.Parse("refine|append|主持人：欢迎冒险者");
 
         Assert.Single(result);
-        Assert.Equal(RefinementOperation.OperationType.Append, result[0].Type);
+        Assert.Equal(IncrementalOperation.OperationType.Append, result[0].Type);
         Assert.Equal("主持人：欢迎冒险者", result[0].Content);
     }
 
@@ -37,7 +37,7 @@ public class RefinementParserTests
         var result = _parser.Parse("refine|insert|3|[场景]：描述");
 
         Assert.Single(result);
-        Assert.Equal(RefinementOperation.OperationType.Insert, result[0].Type);
+        Assert.Equal(IncrementalOperation.OperationType.Insert, result[0].Type);
         Assert.Equal(3, result[0].DisplayIndex);
         Assert.Equal("[场景]：描述", result[0].Content);
     }
@@ -48,7 +48,7 @@ public class RefinementParserTests
         var result = _parser.Parse("refine|edit|2|梅琳：新内容");
 
         Assert.Single(result);
-        Assert.Equal(RefinementOperation.OperationType.Edit, result[0].Type);
+        Assert.Equal(IncrementalOperation.OperationType.Edit, result[0].Type);
         Assert.Equal(2, result[0].DisplayIndex);
         Assert.Equal("梅琳：新内容", result[0].Content);
     }
@@ -59,7 +59,7 @@ public class RefinementParserTests
         var result = _parser.Parse("refine|remove|4");
 
         Assert.Single(result);
-        Assert.Equal(RefinementOperation.OperationType.Remove, result[0].Type);
+        Assert.Equal(IncrementalOperation.OperationType.Remove, result[0].Type);
         Assert.Equal(4, result[0].DisplayIndex);
     }
 
@@ -74,10 +74,10 @@ public class RefinementParserTests
                                    """);
 
         Assert.Equal(4, result.Count);
-        Assert.Equal(RefinementOperation.OperationType.Append, result[0].Type);
-        Assert.Equal(RefinementOperation.OperationType.Append, result[1].Type);
-        Assert.Equal(RefinementOperation.OperationType.Edit, result[2].Type);
-        Assert.Equal(RefinementOperation.OperationType.Remove, result[3].Type);
+        Assert.Equal(IncrementalOperation.OperationType.Append, result[0].Type);
+        Assert.Equal(IncrementalOperation.OperationType.Append, result[1].Type);
+        Assert.Equal(IncrementalOperation.OperationType.Edit, result[2].Type);
+        Assert.Equal(IncrementalOperation.OperationType.Remove, result[3].Type);
     }
 
     [Fact]

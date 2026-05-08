@@ -189,6 +189,94 @@ public class LLMDatabase : IDisposable
         return result is double d ? d : Convert.ToDouble(result!);
     }
 
+    public bool TryEnsureStoryProgressTable()
+    {
+        try
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = """
+                                  CREATE TABLE IF NOT EXISTS story_progress (
+                                      id       REAL PRIMARY KEY NOT NULL,
+                                      content  TEXT NOT NULL
+                                  );
+                              """;
+            cmd.ExecuteNonQuery();
+            return true;
+        }
+        catch (SqliteException ex)
+        {
+            LogRedirector.Info("PowerWordRelive.LLMRequester",
+                $"Story progress table not ready: {ex.Message}");
+            return false;
+        }
+    }
+
+    public List<(double Id, string Content)> GetStoryProgressWindow(int count)
+    {
+        var list = new List<(double, string)>();
+
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = """
+                              SELECT id, content FROM story_progress
+                              ORDER BY id DESC
+                              LIMIT @count
+                          """;
+        cmd.Parameters.AddWithValue("@count", count);
+
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+            list.Add((reader.GetDouble(0), reader.GetString(1)));
+
+        list.Reverse();
+        return list;
+    }
+
+    public double GetNextStoryProgressId(double afterId)
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = "SELECT COALESCE(MIN(id), -1.0) FROM story_progress WHERE id > @after";
+        cmd.Parameters.AddWithValue("@after", afterId);
+
+        var result = cmd.ExecuteScalar();
+        var next = result is double d ? d : Convert.ToDouble(result!);
+        return next > 0 ? next : -1.0;
+    }
+
+    public double GetMaxStoryProgressId()
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = "SELECT COALESCE(MAX(id), 0.0) FROM story_progress";
+
+        var result = cmd.ExecuteScalar();
+        return result is double d ? d : Convert.ToDouble(result!);
+    }
+
+    public void InsertStoryProgress(double id, string content)
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = "INSERT INTO story_progress (id, content) VALUES (@id, @content)";
+        cmd.Parameters.AddWithValue("@id", id);
+        cmd.Parameters.AddWithValue("@content", content);
+        cmd.ExecuteNonQuery();
+    }
+
+    public void UpdateStoryProgress(double id, string content)
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = "UPDATE story_progress SET content = @content WHERE id = @id";
+        cmd.Parameters.AddWithValue("@id", id);
+        cmd.Parameters.AddWithValue("@content", content);
+        cmd.ExecuteNonQuery();
+    }
+
+    public void RemoveStoryProgress(double id)
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = "DELETE FROM story_progress WHERE id = @id";
+        cmd.Parameters.AddWithValue("@id", id);
+        cmd.ExecuteNonQuery();
+    }
+
     public List<DialogueWindowEntry> GetLatestDialogues(int count)
     {
         var list = new List<DialogueWindowEntry>();

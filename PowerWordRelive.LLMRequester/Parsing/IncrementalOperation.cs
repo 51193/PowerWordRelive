@@ -1,6 +1,6 @@
 namespace PowerWordRelive.LLMRequester.Parsing;
 
-public record RefinementOperation
+public record IncrementalOperation
 {
     public enum OperationType
     {
@@ -14,13 +14,13 @@ public record RefinementOperation
     public int? DisplayIndex { get; init; }
     public string? Content { get; init; }
 
-    private RefinementOperation()
+    private IncrementalOperation()
     {
     }
 
-    public static RefinementOperation Insert(int displayIndex, string content)
+    public static IncrementalOperation Insert(int displayIndex, string content)
     {
-        return new RefinementOperation
+        return new IncrementalOperation
         {
             Type = OperationType.Insert,
             DisplayIndex = displayIndex,
@@ -28,27 +28,27 @@ public record RefinementOperation
         };
     }
 
-    public static RefinementOperation Append(string content)
+    public static IncrementalOperation Append(string content)
     {
-        return new RefinementOperation
+        return new IncrementalOperation
         {
             Type = OperationType.Append,
             Content = content
         };
     }
 
-    public static RefinementOperation Remove(int displayIndex)
+    public static IncrementalOperation Remove(int displayIndex)
     {
-        return new RefinementOperation
+        return new IncrementalOperation
         {
             Type = OperationType.Remove,
             DisplayIndex = displayIndex
         };
     }
 
-    public static RefinementOperation Edit(int displayIndex, string content)
+    public static IncrementalOperation Edit(int displayIndex, string content)
     {
-        return new RefinementOperation
+        return new IncrementalOperation
         {
             Type = OperationType.Edit,
             DisplayIndex = displayIndex,

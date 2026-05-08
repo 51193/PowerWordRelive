@@ -15,6 +15,7 @@ public static class LlmConfigParser
             {
                 "speaker_identification" => ParseSpeakerIdentification(key, llmRequestConfig),
                 "refinement" => ParseRefinement(key, llmRequestConfig),
+                "story_progress" => ParseStoryProgress(key, llmRequestConfig),
                 _ => throw new InvalidOperationException($"Unknown request key: {key}")
             };
         return result;
@@ -64,6 +65,16 @@ public static class LlmConfigParser
         var dialogueWindow = ParseIntConfig(key, "dialogue_window", cfg, 30);
         var refinementWindow = ParseIntConfig(key, "refinement_window", cfg, 20);
         return new RefinementConfig(model, thinkingEnabled, reasoningEffort, dialogueWindow, refinementWindow);
+    }
+
+    private static StoryProgressConfig ParseStoryProgress(string key, Dictionary<string, string> cfg)
+    {
+        var model = ParseModel(key, cfg);
+        var thinkingEnabled = ParseThinkingEnabled(key, cfg);
+        var reasoningEffort = ParseReasoningEffort(key, cfg);
+        var refinementWindow = ParseIntConfig(key, "refinement_window", cfg, 20);
+        var storyProgressWindow = ParseIntConfig(key, "story_progress_window", cfg, 15);
+        return new StoryProgressConfig(model, thinkingEnabled, reasoningEffort, refinementWindow, storyProgressWindow);
     }
 
     private static int ParseIntConfig(string key, string subKey, Dictionary<string, string> cfg, int defaultValue)

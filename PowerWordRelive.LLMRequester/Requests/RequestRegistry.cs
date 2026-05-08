@@ -26,6 +26,9 @@ public static class RequestRegistry
                 "refinement" => CreateRefinementRequest(
                     apiUrl, llmToken, db, assembler, (RefinementConfig)config, apiClient),
 
+                "story_progress" => CreateStoryProgressRequest(
+                    apiUrl, llmToken, db, assembler, (StoryProgressConfig)config, apiClient),
+
                 _ => throw new InvalidOperationException($"Unknown request key: {key}")
             };
 
@@ -45,5 +48,18 @@ public static class RequestRegistry
     {
         var container = new RefinementContainer(db);
         return new RefinementRequest(apiUrl, llmToken, db, container, assembler, config, apiClient);
+    }
+
+    private static StoryProgressRequest CreateStoryProgressRequest(
+        string apiUrl,
+        string llmToken,
+        LLMDatabase db,
+        PromptAssembler assembler,
+        StoryProgressConfig config,
+        LlmApiClient apiClient)
+    {
+        var container = new StoryProgressContainer(db);
+        var refContainer = new RefinementContainer(db);
+        return new StoryProgressRequest(apiUrl, llmToken, db, container, refContainer, assembler, config, apiClient);
     }
 }

@@ -4,6 +4,11 @@ const msgCount = document.getElementById('msg-count');
 const scrollBtn = document.getElementById('scroll-bottom');
 const statusDot = document.getElementById('status-indicator');
 const statusText = document.getElementById('status-text');
+const spList = document.getElementById('sp-list');
+const spPrev = document.getElementById('sp-prev');
+const spNext = document.getElementById('sp-next');
+const spPageInfo = document.getElementById('sp-page-info');
+const spPagination = document.getElementById('sp-pagination');
 
 let ws = null;
 let msgId = 0;
@@ -16,6 +21,10 @@ let loading = false;
 let totalRefinements = 0;
 let loadedCount = 0;
 
+let spOffset = 0;
+let spTotal = 0;
+const PAGE_SIZE = 20;
+
 function connect() {
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     ws = new WebSocket(`${protocol}//${location.host}/ws/frontend`);
@@ -27,8 +36,9 @@ function connect() {
         const msg = JSON.parse(event.data);
         if (msg.type === 'status') {
             updateStatus(msg.backend_connected);
-            if (msg.backend_connected && allMessages.length === 0 && !loading) {
-                startLoading();
+            if (msg.backend_connected) {
+                if (allMessages.length === 0 && !loading) startLoading();
+                if (spTotal === 0) loadStoryProgress(0);
             }
             return;
         }
@@ -78,9 +88,7 @@ function queryAsync(query, params) {
             resolve(null);
             return;
         }
-        sendQuery(query, params, (msg) => {
-            resolve(msg);
-        });
+        sendQuery(query, params, (msg) => resolve(msg));
     });
 }
 
@@ -122,22 +130,11 @@ function processItems(items) {
     for (const item of items) {
         const speaker = item.speaker || '';
         const content = item.content || '';
-
         const sceneMatch = content.match(/^\[场景\](.+)/);
         if (sceneMatch) {
-            allMessages.push({
-                speaker,
-                content,
-                isScene: true,
-                sceneText: sceneMatch[1].trim()
-            });
+            allMessages.push({speaker, content, isScene: true, sceneText: sceneMatch[1].trim()});
         } else {
-            allMessages.push({
-                speaker,
-                content,
-                isScene: false,
-                sceneText: null
-            });
+            allMessages.push({speaker, content, isScene: false, sceneText: null});
         }
         if (speaker) uniqueSpeakers.add(speaker);
     }
@@ -228,5 +225,58 @@ characterSelect.addEventListener('change', () => {
     renderMessages();
     scrollToBottom();
 });
+
+async function loadStoryProgress(offset) {
+    const batch = await queryAsync('list_story_progress', {limit: PAGE_SIZE, offset});
+    if (!batch || batch.type === 'error') {
+        spList.innerHTML = '<div class="chat-placeholder">加载失败</div>';
+        return;
+    }
+
+    spOffset = offset;
+    spTotal = batch.total || 0;
+    const items = batch.data || [];
+
+    spList.innerHTML = '';
+    if (items.length === 0) {
+        spList.innerHTML = '<div class="chat-placeholder">暂无故事进展</div>';
+        spPagination.style.display = 'none';
+        return;
+    }
+
+    for (let i = 0; i < items.length; i++) {
+        const entry = document.createElement('div');
+        entry.className = 'sp-entry';
+        const idx = document.createElement('span');
+        idx.className = 'sp-index';
+        idx.textContent = (offset + i + 1) + '. ';
+        const txt = document.createElement('span');
+        txt.className = 'sp-text';
+        txt.textContent = items[i].content || '';
+        entry.appendChild(idx);
+        entry.appendChild(txt);
+        spList.appendChild(entry);
+    }
+
+    const totalPages = Math.ceil(spTotal / PAGE_SIZE) || 1;
+    const currentPage = Math.floor(spOffset / PAGE_SIZE) + 1;
+    spPageInfo.textContent = `第 ${currentPage}/${totalPages} 页`;
+    spPrev.disabled = spOffset <= 0;
+    spNext.disabled = spOffset + PAGE_SIZE >= spTotal;
+    spPagination.style.display = 'flex';
+}
+
+function changeSpPage(direction) {
+    const newOffset = spOffset + direction * PAGE_SIZE;
+    if (newOffset < 0 || newOffset >= spTotal) return;
+    loadStoryProgress(newOffset);
+}
+
+function switchDataTab(tab) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => {
+        if (t.textContent.includes('故事进展')) t.classList.add('active');
+    });
+}
 
 connect();

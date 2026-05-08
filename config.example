@@ -56,6 +56,7 @@ llm.api_url: https://api.deepseek.com/v1/chat/completions
 
 # 定时器（格式：llm_request.timer.<秒数>: <逗号分隔的请求键列表>）
 llm_request.timer.45: speaker_identification, refinement
+llm_request.timer.90: story_progress
 
 # Speaker ID 推断请求参数
 llm_request.speaker_identification.model: deepseek-v4-pro
@@ -69,6 +70,13 @@ llm_request.refinement.thinking_enabled: true
 llm_request.refinement.reasoning_effort: high
 llm_request.refinement.dialogue_window: 30
 llm_request.refinement.refinement_window: 20
+
+# 故事进展请求参数
+llm_request.story_progress.model: deepseek-v4-flash
+llm_request.story_progress.thinking_enabled: true
+llm_request.story_progress.reasoning_effort: high
+llm_request.story_progress.refinement_window: 20
+llm_request.story_progress.story_progress_window: 15
 
 # 持久化存储（SQLite）
 storage.sqlite_path: ./data/pwr.db

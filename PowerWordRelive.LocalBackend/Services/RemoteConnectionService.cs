@@ -122,6 +122,7 @@ public class RemoteConnectionService
         {
             "list_refinements" => await dbService.ListRefinementsAsync(limit, offset),
             "list_transcriptions" => await dbService.ListTranscriptionsAsync(limit, offset),
+            "list_story_progress" => await dbService.ListStoryProgressAsync(limit, offset),
             _ => throw new Exception($"Unknown query: {query}")
         };
     }

@@ -1,6 +1,6 @@
 # Power Word Relive
 
-实时捕获系统音频，将连续语音切分为按说话人分离的音频片段，转录为文本并入库，通过 LLM 进行说话人识别和对话精炼，最终通过远端 Web 前端查询精炼结果。
+实时捕获系统音频，将连续语音切分为按说话人分离的音频片段，转录为文本并入库，通过 LLM 进行说话人识别、对话精炼和故事进展生成，最终通过远端 Web 前端查询结果。
 
 ## 架构
 
@@ -11,7 +11,7 @@ CLI (PowerWordRelive.CLI)
         ├── SpeakerSplit ─────── 说话人分离
         ├── Transcribe ───────── 语音转录 (ASR)
         ├── TranscriptionStore ── SRT 入库 (SQLite)
-        ├── LLMRequester ─────── 说话人识别 + 对话精炼 (LLM)
+        ├── LLMRequester ─────── 说话人识别 + 对话精炼 + 故事进展 (LLM)
         └── LocalBackend ─────── 远端查询后端 (只读 DB)
 
 RemoteBackend (独立运行, ASP.NET Core)
@@ -50,7 +50,8 @@ RemoteBackend (独立运行, ASP.NET Core)
 通过定时器驱动，对数据库内容进行 LLM 增强：
 - **说话人识别**：将未确认的 speaker ID 发送给 LLM，根据角色卡和上下文推断角色名
 - **对话精炼**：将转录文本结合已有精炼结果窗，由 LLM 输出增删改操作，存储在 `refinement_results` 表中
-- 精炼表使用浮点主键，支持插入式排序
+- **故事进展**：基于精炼结果，由 LLM 维护章节梗概式叙事，存储在 `story_progress` 表中
+- 精炼表和故事进展表使用浮点主键，支持插入式排序
 
 ### 6. 远端查询前端（RemoteBackend + LocalBackend）
 
@@ -115,8 +116,10 @@ storage.sqlite_path: ./data/pwr.db
 llm.token: sk-your_token_here
 llm.api_url: https://api.deepseek.com/v1/chat/completions
 llm_request.timer.45: speaker_identification,refinement
+llm_request.timer.90: story_progress
 llm_request.speaker_identification.model: deepseek-v4-pro
 llm_request.refinement.model: deepseek-v4-flash
+llm_request.story_progress.model: deepseek-v4-flash
 
 # ── HuggingFace Token ──
 huggingface.token: hf_your_token_here
@@ -212,7 +215,8 @@ out/PowerWordRelive.CLI/PowerWordRelive.CLI
     └── pwr.db                    # SQLite 数据库
         ├── transcriptions        # 转录条目
         ├── speaker_mappings      # 说话人 → 角色名映射
-        └── refinement_results    # LLM 精炼对话
+        ├── refinement_results    # LLM 精炼对话
+        └── story_progress        # LLM 故事进展
 ```
 
 ## 性能

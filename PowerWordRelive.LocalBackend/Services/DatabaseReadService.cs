@@ -92,6 +92,36 @@ public class DatabaseReadService
         return (items, total);
     }
 
+    public async Task<(List<object> items, int total)> ListStoryProgressAsync(int limit, int offset)
+    {
+        if (!_fs.FileExists(_dbPath))
+            return (new List<object>(), 0);
+
+        await using var conn = CreateReadOnlyConnection();
+        await conn.OpenAsync();
+
+        if (!await TableExists(conn, "story_progress"))
+            return (new List<object>(), 0);
+
+        var items = new List<object>();
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT content FROM story_progress ORDER BY id LIMIT @limit OFFSET @offset";
+        cmd.Parameters.AddWithValue("@limit", limit);
+        cmd.Parameters.AddWithValue("@offset", offset);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+            items.Add(new { content = reader.GetString(0) });
+
+        var total = 0;
+        await using var countCmd = conn.CreateCommand();
+        countCmd.CommandText = "SELECT COUNT(*) FROM story_progress";
+        var countResult = await countCmd.ExecuteScalarAsync();
+        if (countResult != null)
+            total = Convert.ToInt32(countResult);
+
+        return (items, total);
+    }
+
     private SqliteConnection CreateReadOnlyConnection()
     {
         return new SqliteConnection($"Data Source={_dbPath};Mode=ReadOnly");

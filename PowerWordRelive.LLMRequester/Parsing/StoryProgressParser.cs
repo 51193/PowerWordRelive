@@ -2,15 +2,15 @@ using PowerWordRelive.Infrastructure.Logging;
 
 namespace PowerWordRelive.LLMRequester.Parsing;
 
-public class RefinementParser : CommandParser<IncrementalOperation>
+public class StoryProgressParser : CommandParser<IncrementalOperation>
 {
-    private const string RefinePrefix = "refine|";
+    private const string SpPrefix = "story_progress|";
 
-    protected override string Prefix => RefinePrefix;
+    protected override string Prefix => SpPrefix;
 
     protected override IncrementalOperation? ParseLine(string line)
     {
-        var body = line[RefinePrefix.Length..];
+        var body = line[SpPrefix.Length..];
         var parts = body.Split('|');
 
         if (parts.Length < 2)
@@ -30,7 +30,6 @@ public class RefinementParser : CommandParser<IncrementalOperation>
 
     private IncrementalOperation? ParseAppend(string[] parts)
     {
-        // parts[0] == "append", parts[1..] == content
         if (parts.Length < 2)
             return null;
 
@@ -38,7 +37,7 @@ public class RefinementParser : CommandParser<IncrementalOperation>
         if (string.IsNullOrEmpty(content))
         {
             LogRedirector.Warn("PowerWordRelive.LLMRequester",
-                "Refine append has empty content");
+                "Story progress append has empty content");
             return null;
         }
 
@@ -47,7 +46,6 @@ public class RefinementParser : CommandParser<IncrementalOperation>
 
     private IncrementalOperation? ParseInsert(string[] parts)
     {
-        // parts[0] == "insert", parts[1] == index, parts[2..] == content
         if (parts.Length < 3)
             return null;
 
@@ -57,14 +55,14 @@ public class RefinementParser : CommandParser<IncrementalOperation>
         if (!int.TryParse(indexStr, out var index) || index < 1)
         {
             LogRedirector.Warn("PowerWordRelive.LLMRequester",
-                $"Refine insert has invalid index: {indexStr}");
+                $"Story progress insert has invalid index: {indexStr}");
             return null;
         }
 
         if (string.IsNullOrEmpty(content))
         {
             LogRedirector.Warn("PowerWordRelive.LLMRequester",
-                "Refine insert has empty content");
+                "Story progress insert has empty content");
             return null;
         }
 
@@ -82,14 +80,14 @@ public class RefinementParser : CommandParser<IncrementalOperation>
         if (!int.TryParse(indexStr, out var index) || index < 1)
         {
             LogRedirector.Warn("PowerWordRelive.LLMRequester",
-                $"Refine edit has invalid index: {indexStr}");
+                $"Story progress edit has invalid index: {indexStr}");
             return null;
         }
 
         if (string.IsNullOrEmpty(content))
         {
             LogRedirector.Warn("PowerWordRelive.LLMRequester",
-                "Refine edit has empty content");
+                "Story progress edit has empty content");
             return null;
         }
 
@@ -105,7 +103,7 @@ public class RefinementParser : CommandParser<IncrementalOperation>
         if (!int.TryParse(indexStr, out var index) || index < 1)
         {
             LogRedirector.Warn("PowerWordRelive.LLMRequester",
-                $"Refine remove has invalid index: {indexStr}");
+                $"Story progress remove has invalid index: {indexStr}");
             return null;
         }
 
