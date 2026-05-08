@@ -139,8 +139,6 @@ def run_server():
     try:
         model = AutoModel(
             model=args.model,
-            vad_model="fsmn-vad",
-            vad_kwargs={"max_single_segment_time": 60000},
             device=args.device,
             disable_pbar=True,
             disable_update=True,

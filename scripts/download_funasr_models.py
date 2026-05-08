@@ -19,8 +19,6 @@ def main():
 
     model = AutoModel(
         model="paraformer-zh",
-        vad_model="fsmn-vad",
-        vad_kwargs={"max_single_segment_time": 60000},
         disable_pbar=True,
         disable_update=True,
     )
