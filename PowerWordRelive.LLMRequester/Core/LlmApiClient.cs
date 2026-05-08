@@ -13,7 +13,10 @@ public record LlmResponse(string Content, int OutputTokens, int CachedInputToken
 
 public class LlmApiClient
 {
-    private static readonly HttpClient HttpClient = new();
+    private static readonly HttpClient HttpClient = new()
+    {
+        Timeout = TimeSpan.FromSeconds(120)
+    };
 #if DEBUG
     private static readonly object LogLock = new();
 #endif
