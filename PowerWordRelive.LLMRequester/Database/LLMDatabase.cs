@@ -121,18 +121,35 @@ public class LLMDatabase : IDisposable
         }
     }
 
-    public List<(double Id, string Speaker, string Content)> GetAllRefinementEntries()
+    public List<(double Id, string Speaker, string Content)> GetRefinementWindow(int count)
     {
         var list = new List<(double, string, string)>();
 
         using var cmd = _connection.CreateCommand();
-        cmd.CommandText = "SELECT id, speaker, content FROM refinement_results ORDER BY id ASC";
+        cmd.CommandText = """
+                              SELECT id, speaker, content FROM refinement_results
+                              ORDER BY id DESC
+                              LIMIT @count
+                          """;
+        cmd.Parameters.AddWithValue("@count", count);
 
         using var reader = cmd.ExecuteReader();
         while (reader.Read())
             list.Add((reader.GetDouble(0), reader.GetString(1), reader.GetString(2)));
 
+        list.Reverse();
         return list;
+    }
+
+    public double GetNextRefinementId(double afterId)
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = "SELECT COALESCE(MIN(id), -1.0) FROM refinement_results WHERE id > @after";
+        cmd.Parameters.AddWithValue("@after", afterId);
+
+        var result = cmd.ExecuteScalar();
+        var next = result is double d ? d : Convert.ToDouble(result!);
+        return next > 0 ? next : -1.0;
     }
 
     public void InsertRefinement(double id, string speaker, string content)

@@ -10,9 +10,7 @@ public class RefinementContainer : IIncrementalContainer<string>
     private static readonly Regex SpeakerContentPattern = new(@"^([^：:]+)[：:](.+)$", RegexOptions.Compiled);
 
     private readonly LLMDatabase _db;
-    private List<double> _floatIds = new();
-    private int _lastWindowSize;
-    private int _windowStart;
+    private List<double> _ids = new();
 
     public RefinementContainer(LLMDatabase db)
     {
@@ -21,89 +19,87 @@ public class RefinementContainer : IIncrementalContainer<string>
 
     public IReadOnlyList<string> Get(int count)
     {
-        _lastWindowSize = count;
+        if (count <= 0)
+            return Array.Empty<string>();
 
-        var entries = _db.GetAllRefinementEntries();
-        _floatIds = entries.ConvertAll(e => e.Id);
-        _windowStart = Math.Max(0, _floatIds.Count - count);
+        var entries = _db.GetRefinementWindow(count);
+        _ids = entries.ConvertAll(e => e.Id);
 
-        var window = entries.GetRange(_windowStart, entries.Count - _windowStart);
-        return window.ConvertAll(e => $"{e.Speaker}：{e.Content}").AsReadOnly();
+        return entries.ConvertAll(e => $"{e.Speaker}：{e.Content}").AsReadOnly();
     }
 
     public void Add(int displayIndex, string content)
     {
-        if (_floatIds.Count == 0)
+        if (_ids.Count == 0)
         {
             var (speaker, text) = SplitSpeakerContent(content);
             _db.InsertRefinement(1.0, speaker, text);
-            _floatIds.Add(1.0);
-            _windowStart = 0;
             return;
         }
 
-        var realIdx = _windowStart + displayIndex - 1;
-        if (realIdx >= _floatIds.Count)
+        var idx = displayIndex - 1;
+        if (idx >= _ids.Count)
         {
             LogRedirector.Warn("PowerWordRelive.LLMRequester",
-                $"Refinement insert index {displayIndex} exceeds snapshot range");
+                $"Insert index {displayIndex} exceeds window size {_ids.Count}");
             return;
         }
 
-        var idAt = _floatIds[realIdx];
-        var idNext = realIdx + 1 < _floatIds.Count
-            ? _floatIds[realIdx + 1]
-            : idAt + 1.0;
+        var idAt = _ids[idx];
+        double newId;
 
-        var newId = (idAt + idNext) / 2.0;
+        if (idx + 1 < _ids.Count)
+        {
+            newId = (idAt + _ids[idx + 1]) / 2.0;
+        }
+        else
+        {
+            var nextInDb = _db.GetNextRefinementId(idAt);
+            newId = nextInDb > 0 ? (idAt + nextInDb) / 2.0 : idAt + 1.0;
+        }
         var (s, c) = SplitSpeakerContent(content);
         _db.InsertRefinement(newId, s, c);
-        _floatIds.Insert(realIdx + 1, newId);
     }
 
     public void Add(string content)
     {
-        var maxId = _floatIds.Count > 0 ? _floatIds[^1] : 0.0;
+        var maxId = _ids.Count > 0 ? _ids[^1] : _db.GetMaxRefinementId();
         var newId = maxId == 0.0 ? 1.0 : maxId + 1.0;
         var (speaker, text) = SplitSpeakerContent(content);
         _db.InsertRefinement(newId, speaker, text);
-        _floatIds.Add(newId);
     }
 
     public void Remove(int displayIndex)
     {
-        if (_floatIds.Count == 0)
+        if (_ids.Count == 0)
             return;
 
-        var realIdx = _windowStart + displayIndex - 1;
-        if (realIdx >= _floatIds.Count)
+        var idx = displayIndex - 1;
+        if (idx >= _ids.Count)
         {
             LogRedirector.Warn("PowerWordRelive.LLMRequester",
-                $"Refinement remove index {displayIndex} exceeds snapshot range");
+                $"Remove index {displayIndex} exceeds window size {_ids.Count}");
             return;
         }
 
-        var floatId = _floatIds[realIdx];
-        _db.RemoveRefinement(floatId);
-        _floatIds.RemoveAt(realIdx);
+        _db.RemoveRefinement(_ids[idx]);
     }
 
     public void Edit(int displayIndex, string newContent)
     {
-        if (_floatIds.Count == 0)
+        if (_ids.Count == 0)
             return;
 
-        var realIdx = _windowStart + displayIndex - 1;
-        if (realIdx >= _floatIds.Count)
+        var idx = displayIndex - 1;
+        if (idx >= _ids.Count)
         {
             LogRedirector.Warn("PowerWordRelive.LLMRequester",
-                $"Refinement edit index {displayIndex} exceeds snapshot range");
+                $"Edit index {displayIndex} exceeds window size {_ids.Count}");
             return;
         }
 
-        var floatId = _floatIds[realIdx];
         var (speaker, text) = SplitSpeakerContent(newContent);
-        _db.UpdateRefinement(floatId, speaker, text);
+        _db.UpdateRefinement(_ids[idx], speaker, text);
     }
 
     private static (string Speaker, string Content) SplitSpeakerContent(string content)
