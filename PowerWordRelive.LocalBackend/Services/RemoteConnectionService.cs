@@ -4,28 +4,24 @@ using System.Text;
 using System.Text.Json;
 using PowerWordRelive.Infrastructure.Logging;
 using PowerWordRelive.Infrastructure.Messages;
-using PowerWordRelive.Infrastructure.Storage;
 using PowerWordRelive.LocalBackend.Models;
 
 namespace PowerWordRelive.LocalBackend.Services;
 
 public class RemoteConnectionService
 {
-    private readonly IFileSystem _fs;
     private readonly byte[] _key;
     private readonly LocalBackendOptions _options;
 
-    public RemoteConnectionService(LocalBackendOptions options, IFileSystem fs)
+    public RemoteConnectionService(LocalBackendOptions options)
     {
         _options = options;
-        _fs = fs;
-        var keyBase64 = fs.ReadAllText(options.KeyPath).Trim();
-        _key = Convert.FromBase64String(keyBase64);
+        _key = options.Key;
     }
 
     public async Task ConnectAndRelayAsync(DatabaseReadService dbService)
     {
-        var url = $"ws://{_options.RemoteHost}:{_options.RemotePort}/ws/backend";
+        var url = $"ws://{_options.Host}:{_options.Port}/ws/backend";
         using var ws = new ClientWebSocket();
         await ws.ConnectAsync(new Uri(url), CancellationToken.None);
         LogRedirector.Info("LocalBackend", $"Connected to {url}");
@@ -72,37 +68,50 @@ public class RemoteConnectionService
 
     private async Task RelayLoop(ClientWebSocket ws, byte[] buffer, DatabaseReadService dbService)
     {
-        while (ws.State == WebSocketState.Open)
+        try
         {
-            var msg = await ReceiveJson(ws, buffer, TimeSpan.FromDays(1));
-            if (msg == null) break;
-
-            if (msg.Type != "query" || msg.Query == null)
-                continue;
-
-            try
+            while (ws.State == WebSocketState.Open)
             {
-                var (data, total) = await ExecuteQuery(dbService, msg.Query, msg.Params);
-                var response = new WsMessage
+                var msg = await ReceiveJson(ws, buffer, TimeSpan.FromDays(1));
+                if (msg == null)
                 {
-                    Type = "result",
-                    Id = msg.Id,
-                    Data = JsonSerializer.SerializeToElement(data),
-                    Total = total
-                };
-                await SendJson(ws, response);
-            }
-            catch (Exception ex)
-            {
-                LogRedirector.Warn("LocalBackend", $"Query '{msg.Query}' failed: {ex.Message}");
-                var error = new WsMessage
+                    LogRedirector.Warn("LocalBackend",
+                        $"WebSocket closed, state={ws.State}, closeStatus={ws.CloseStatus}");
+                    break;
+                }
+
+                if (msg.Type != "query" || msg.Query == null)
+                    continue;
+
+                try
                 {
-                    Type = "error",
-                    Id = msg.Id,
-                    Message = ex.Message
-                };
-                await SendJson(ws, error);
+                    var (data, total) = await ExecuteQuery(dbService, msg.Query, msg.Params);
+                    var response = new WsMessage
+                    {
+                        Type = "result",
+                        Id = msg.Id,
+                        Data = JsonSerializer.SerializeToElement(data),
+                        Total = total
+                    };
+                    await SendJson(ws, response);
+                }
+                catch (Exception ex)
+                {
+                    LogRedirector.Warn("LocalBackend", $"Query '{msg.Query}' failed: {ex.Message}");
+                    var error = new WsMessage
+                    {
+                        Type = "error",
+                        Id = msg.Id,
+                        Message = ex.Message
+                    };
+                    await SendJson(ws, error);
+                }
             }
+        }
+        catch (Exception ex)
+        {
+            LogRedirector.Warn("LocalBackend",
+                $"RelayLoop exception, ws.State={ws.State}: {ex.GetType().Name}: {ex.Message}");
         }
     }
 

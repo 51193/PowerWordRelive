@@ -28,6 +28,7 @@ tar -czf "$PKG_DIR/pwr-main-${VERSION}-${RID}.tar.gz" \
     PowerWordRelive.TranscriptionStore \
     PowerWordRelive.LLMRequester \
     PowerWordRelive.LocalBackend \
+    PowerWordRelive.RemoteBackend \
     text_data \
     setup.sh \
     setup.ps1 \

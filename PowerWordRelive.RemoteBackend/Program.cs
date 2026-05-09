@@ -1,16 +1,13 @@
-using PowerWordRelive.Infrastructure.Storage;
 using PowerWordRelive.RemoteBackend.Services;
 
-var fs = new LocalFileSystem();
-var config = new ConfigService(fs);
+var cfg = StartupConfig.Create(args);
 
-var builder = WebApplication.CreateBuilder(args);
-builder.Logging.ClearProviders();
-builder.WebHost.UseUrls($"http://0.0.0.0:{config.Port}");
-
-builder.Services.AddSingleton(fs);
-builder.Services.AddSingleton(sp => new BackendConnectionManager(
-    config.KeyPath, fs, sp.GetRequiredService<ILogger<BackendConnectionManager>>()));
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    ContentRootPath = cfg.ContentRoot,
+    Args = cfg.BuilderArgs
+});
+cfg.RegisterServices(builder.Services, cfg.Key);
 
 var app = builder.Build();
 
@@ -25,7 +22,6 @@ app.Map("/ws/backend", async (HttpContext context, BackendConnectionManager mana
         context.Response.StatusCode = 400;
         return;
     }
-
     await manager.HandleBackendWebSocket(context);
 });
 
@@ -36,7 +32,6 @@ app.Map("/ws/frontend", async (HttpContext context, BackendConnectionManager man
         context.Response.StatusCode = 400;
         return;
     }
-
     await manager.HandleFrontendWebSocket(context);
 });
 

@@ -39,6 +39,22 @@ internal class LogMultiplexer
     public async Task ReadStderrAsync(StreamReader reader)
     {
         string? line;
-        while ((line = await reader.ReadLineAsync()) != null) LogRedirector.Warn(_processName, line);
+        while ((line = await reader.ReadLineAsync()) != null)
+        {
+            try
+            {
+                var entry = JsonSerializer.Deserialize<LogEntry>(line);
+                if (entry is not null)
+                {
+                    LogRedirector.Log(entry.Level, _processName, entry.Message, entry.Data);
+                    continue;
+                }
+            }
+            catch (JsonException)
+            {
+            }
+
+            LogRedirector.Warn(_processName, line);
+        }
     }
 }

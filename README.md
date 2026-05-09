@@ -11,7 +11,7 @@
 - **追踪故事进展**：AI 自动记录剧情推进到哪里，生成章节概要
 - **管理任务清单**：AI 帮你追踪团队接到的所有任务，该做的、做完的、忘了的、失败的，一目了然
 - **建立世界观词典**：AI 自动记录所有出现的人物、地点、物品，再也不怕忘了 NPC 叫什么
-- **网页查看**：跑完团用浏览器打开，像翻聊天记录一样回顾整场游戏
+- **网页查看**：内建本地 Web 界面，开浏览器就能像翻聊天记录一样回顾整场游戏；也支持部署到远端服务器
 
 ## 开始使用
 
@@ -89,7 +89,7 @@ modelscope.token: ms_xxxxxxxxxxxxxxxx
 > 1. 注册 HuggingFace 账号：[huggingface.co/join](https://huggingface.co/join)
 > 2. 打开 https://huggingface.co/pyannote/speaker-diarization-3.1 ，点"Agree and access repository"
 > 3. 页面会弹一个简单的小问卷，随便填一下就行（不影响使用）
-> 4. 去 https://huggingface.co/settings/tokens 创建一个 Access Token（类型选"Fine-grained"）
+> 4. 去 https://huggingface.co/settings/tokens 创建一个 Access Token（类型选"Read"）
 > 5. 把生成的 Token 填到上面 `huggingface.token` 那一行
 
 其他所有配置项保持默认即可，不需要动。
@@ -122,9 +122,9 @@ work_root/
 
 ### 用网页查看
 
-如果你有台服务器，可以把网页前端部署上去，用浏览器查看所有内容——像翻聊天记录一样，还能按角色筛选、翻看任务列表、查看世界观词典。
+启动后在浏览器打开 `http://localhost:9501`（端口由 `config` 中的 `local_mode.local_port` 决定），即可查看所有对话记录、故事进展、任务清单和世界观词典。
 
-部署方法见下方"服务器部署"一节。
+如果你想在别的设备上查看（比如边跑团边用手机看），需要部署到一台有公网 IP 的服务器上。部署方法见下方"远程服务器部署"一节。
 
 ## 配置参考
 
@@ -138,6 +138,26 @@ work_root/
 general.work_root: /home/你/trpg-data
 # Windows:
 general.work_root: C:\Users\你\trpg-data
+```
+
+### 本地网页
+
+```
+# 本地 Web 界面的端口号
+# 程序启动后浏览器打开 http://localhost:9501 即可查看
+local_mode.local_port: 9501
+```
+
+### 远端后端连接（可选）
+
+```
+# 设为 true 以额外连接一个远端后端（与本地网页同时生效）
+local_backend.remote_enabled: false
+local_backend.remote_host: your.remote.server.com
+local_backend.remote_port: 9500
+local_backend.key_path: /etc/pwr/local_backend.key
+local_backend.max_reconnect_attempts: 5
+local_backend.initial_reconnect_delay_sec: 2
 ```
 
 ### LLM（AI 模型）
@@ -193,13 +213,13 @@ modelscope.token: （可选）在此填入你的ModelScope访问令牌
 **获取方法：**
 
 1. 打开 https://modelscope.cn/my/overview → 登录（可用阿里云 / GitHub / 手机号注册）
-2. 点击左侧"访问令牌" → "创建访问令牌"
+2. 点击左侧"访问控制" → "创建访问令牌"
 3. 随便填个名称 → 确认创建
 4. 复制生成的 Token，填入上面 `modelscope.token` 一行
 
-## 服务器部署
+## 远程服务器部署
 
-如果你想在网页上查看游戏记录（比如边跑团边用手机看），需要部署服务器端。一台有公网 IP 的服务器就行。
+> 本地网页已经开箱即用（`http://localhost:9501`）。以下仅当你需要在其他设备上远程查看时才需要。一台有公网 IP 的服务器就行。
 
 ### 1. 在服务器上下载 RemoteBackend 包
 
@@ -270,6 +290,7 @@ dotnet PowerWordRelive.RemoteBackend/PowerWordRelive.RemoteBackend.dll
 在本地电脑的 `config` 中修改：
 
 ```
+local_backend.remote_enabled: true
 local_backend.remote_host: 你服务器的IP
 local_backend.remote_port: 9500
 local_backend.key_path: ./keys/local_backend.key
@@ -377,11 +398,10 @@ CLI（用户入口）
         ├── Transcribe        # 语音转文字
         ├── TranscriptionStore # 写入数据库
         ├── LLMRequester      # AI 处理（说话人识别、对话精炼、故事进展、任务、一致性表）
-        └── LocalBackend      # 网页查询后端
+        ├── RemoteBackend     # 本地 Web 服务（提供网页界面）
+        └── LocalBackend      # 网页查询后端（连接本地 RemoteBackend 或远端）
 
-RemoteBackend（独立 ASP.NET 服务）
-  ├── 接受 LocalBackend 连接（加密）
-  └── 提供网页前端
+RemoteBackend 也支持独立部署到远端服务器，供远程查看。
 ```
 
 LLMRequester 内部维护 5 种 AI 请求，按定时器循环触发：

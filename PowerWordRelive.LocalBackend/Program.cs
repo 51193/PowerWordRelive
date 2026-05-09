@@ -5,16 +5,12 @@ using PowerWordRelive.Infrastructure.Storage;
 using PowerWordRelive.LocalBackend.Models;
 using PowerWordRelive.LocalBackend.Services;
 
-var fs = new LocalFileSystem();
-
 var platform = PlatformServicesFactory.Create();
-
 var config = ChildConfigReader.ReadConfig();
-var options = LocalBackendOptions.FromConfig(config, fs);
+var options = LocalBackendOptions.Create(args, config);
 
-LogRedirector.Info("LocalBackend", $"Starting, remote={options.RemoteHost}:{options.RemotePort}");
-
-var dbService = new DatabaseReadService(options.SqlitePath, fs);
+LogRedirector.Info("LocalBackend",
+    $"Starting, host={options.Host}:{options.Port}");
 
 platform.RegisterShutdownSignal(() =>
 {
@@ -29,7 +25,8 @@ Console.CancelKeyPress += (_, e) =>
     Environment.Exit(0);
 };
 
-var connectionService = new RemoteConnectionService(options, fs);
+var dbService = new DatabaseReadService(options.SqlitePath, new LocalFileSystem());
+var connectionService = new RemoteConnectionService(options);
 
 for (var attempt = 0; attempt <= options.MaxReconnectAttempts; attempt++)
 {
@@ -51,5 +48,6 @@ for (var attempt = 0; attempt <= options.MaxReconnectAttempts; attempt++)
     }
 }
 
-LogRedirector.Error("LocalBackend", $"Max reconnect attempts ({options.MaxReconnectAttempts}) exhausted, exiting");
+LogRedirector.Error("LocalBackend",
+    $"Max reconnect attempts ({options.MaxReconnectAttempts}) exhausted, exiting");
 Environment.Exit(1);

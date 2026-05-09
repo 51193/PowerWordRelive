@@ -3,8 +3,8 @@ using System.Net.WebSockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using PowerWordRelive.Infrastructure.Logging;
 using PowerWordRelive.Infrastructure.Messages;
-using PowerWordRelive.Infrastructure.Storage;
 
 namespace PowerWordRelive.RemoteBackend.Services;
 
@@ -13,14 +13,15 @@ public class BackendConnectionManager
     private readonly ConcurrentDictionary<string, WebSocket> _frontendClients = new();
     private readonly object _gate = new();
     private readonly byte[] _key;
-    private readonly ILogger<BackendConnectionManager> _logger;
+    private readonly ILogAdapter _log;
     private WebSocket? _backendSocket;
 
-    public BackendConnectionManager(string keyPath, IFileSystem fs, ILogger<BackendConnectionManager> logger)
+    public BackendConnectionManager(byte[] key, ILogAdapter log)
     {
-        _logger = logger;
-        var keyBase64 = fs.ReadAllText(keyPath).Trim();
-        _key = Convert.FromBase64String(keyBase64);
+        if (key.Length == 0)
+            throw new ArgumentException("Key must not be empty", nameof(key));
+        _key = key;
+        _log = log;
     }
 
     public bool IsConnected
@@ -36,49 +37,44 @@ public class BackendConnectionManager
 
     public async Task HandleBackendWebSocket(HttpContext context)
     {
-        using var ws = await context.WebSockets.AcceptWebSocketAsync();
+        var ws = await context.WebSockets.AcceptWebSocketAsync();
         var buffer = new byte[8192];
-
-        var authenticated = await AuthenticateBackend(ws, buffer);
-        if (!authenticated)
-        {
-            await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "auth failed", CancellationToken.None);
-            _logger.LogWarning("Backend auth failed");
-            return;
-        }
-
-        bool acquired;
-        lock (_gate)
-        {
-            acquired = _backendSocket == null;
-            if (acquired) _backendSocket = ws;
-        }
-
-        if (!acquired)
-        {
-            await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "already connected", CancellationToken.None);
-            _logger.LogWarning("Rejected authenticated backend: already connected");
-            return;
-        }
-
-        _logger.LogInformation("Backend connected");
-        await BroadcastStatusToFrontends(true);
 
         try
         {
+            var authenticated = await AuthenticateBackend(ws, buffer);
+            if (!authenticated)
+            {
+                _log.Warn("Backend auth failed");
+                return;
+            }
+
+            bool acquired;
+            lock (_gate)
+            {
+                acquired = _backendSocket == null;
+                if (acquired) _backendSocket = ws;
+            }
+
+            if (!acquired)
+            {
+                _log.Warn("Rejected authenticated backend: already connected");
+                return;
+            }
+
+            _log.Info("Backend connected");
+            await BroadcastStatusToFrontends(true);
             await RelayLoop(ws, buffer);
-        }
-        catch (WebSocketException)
-        {
         }
         finally
         {
             lock (_gate)
             {
-                _backendSocket = null;
+                if (_backendSocket == ws)
+                    _backendSocket = null;
             }
 
-            _logger.LogInformation("Backend disconnected");
+            _log.Info("Backend disconnected");
             await BroadcastStatusToFrontends(false);
         }
     }
@@ -89,7 +85,7 @@ public class BackendConnectionManager
         var clientId = Guid.NewGuid().ToString("N");
         _frontendClients[clientId] = ws;
 
-        _logger.LogInformation("Frontend client {ClientId} connected", clientId);
+        _log.Info($"Frontend client {clientId} connected");
 
         try
         {
@@ -103,7 +99,7 @@ public class BackendConnectionManager
         finally
         {
             _frontendClients.TryRemove(clientId, out _);
-            _logger.LogInformation("Frontend client {ClientId} disconnected", clientId);
+            _log.Info($"Frontend client {clientId} disconnected");
         }
     }
 
@@ -130,7 +126,8 @@ public class BackendConnectionManager
 
             using var aes = Aes.Create();
             aes.Key = _key;
-            using var decryptor = aes.CreateDecryptor(iv, null);
+            aes.IV = iv;
+            using var decryptor = aes.CreateDecryptor();
             var plainBytes = decryptor.TransformFinalBlock(ciphertext, 0, ciphertext.Length);
             var decrypted = Encoding.UTF8.GetString(plainBytes);
             return decrypted == nonce;
@@ -139,20 +136,6 @@ public class BackendConnectionManager
         {
             return false;
         }
-    }
-
-    private static string EncryptAes(byte[] key, string plaintext)
-    {
-        using var aes = Aes.Create();
-        aes.Key = key;
-        aes.GenerateIV();
-        using var encryptor = aes.CreateEncryptor();
-        var plainBytes = Encoding.UTF8.GetBytes(plaintext);
-        var cipherBytes = encryptor.TransformFinalBlock(plainBytes, 0, plainBytes.Length);
-        var result = new byte[aes.IV.Length + cipherBytes.Length];
-        Buffer.BlockCopy(aes.IV, 0, result, 0, aes.IV.Length);
-        Buffer.BlockCopy(cipherBytes, 0, result, aes.IV.Length, cipherBytes.Length);
-        return Convert.ToBase64String(result);
     }
 
     private async Task FrontendReceiveLoop(WebSocket ws, byte[] buffer, string clientId)

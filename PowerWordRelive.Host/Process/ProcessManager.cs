@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using PowerWordRelive.Host.Models;
 using PowerWordRelive.Infrastructure.Logging;
 using PowerWordRelive.Infrastructure.Platform;
@@ -23,6 +24,9 @@ internal class ProcessManager
     public async Task LaunchAllAsync()
     {
         var definitions = GetProcessDefinitions();
+        definitions = RemoveManagedDefinitions(definitions);
+        AddLocalWebProcesses(definitions);
+
         if (definitions.Count == 0)
         {
             LogRedirector.Warn("PowerWordRelive.Host", "No processes defined in config");
@@ -43,7 +47,7 @@ internal class ProcessManager
 
             try
             {
-                var spawned = ProcessSpawner.Spawn(def.Name, dllPath, subConfig);
+                var spawned = ProcessSpawner.Spawn(def.Name, dllPath, subConfig, def.ExtraArgs);
                 _spawned.Add(spawned);
             }
             catch (Exception ex)
@@ -51,6 +55,101 @@ internal class ProcessManager
                 LogRedirector.Error("PowerWordRelive.Host", "Failed to spawn process",
                     new { process = def.Name, error = ex.Message });
             }
+        }
+    }
+
+    private static List<ProcessDefinition> RemoveManagedDefinitions(List<ProcessDefinition> definitions)
+    {
+        return definitions.Where(d => d.Name != "local_backend_remote").ToList();
+    }
+
+    private void AddLocalWebProcesses(List<ProcessDefinition> definitions)
+    {
+        var (localPort, localKeyBase64) = ReadLocalModeConfig();
+        if (!localPort.HasValue)
+            return;
+
+        definitions.RemoveAll(d => d.Name == "local_backend");
+
+        definitions.Add(new ProcessDefinition(
+            "remote_backend", "PowerWordRelive.RemoteBackend",
+            Array.Empty<string>(),
+            $"--mode local --port {localPort.Value} --key {localKeyBase64}"));
+
+        definitions.Add(new ProcessDefinition(
+            "local_backend_local", "PowerWordRelive.LocalBackend",
+            new[] { "storage", "general" },
+            $"--mode local --port {localPort.Value} --key {localKeyBase64}"));
+
+        TryAddRemoteBackend(definitions);
+    }
+
+    private (int? port, string? keyBase64) ReadLocalModeConfig()
+    {
+        if (!_config.TryGetValue("local_mode", out var localMode))
+        {
+            LogRedirector.Error("PowerWordRelive.Host",
+                "local_mode.local_port not configured, skipping local web suite");
+            return (null, null);
+        }
+
+        if (!localMode.TryGetValue("local_port", out var portStr) ||
+            !int.TryParse(portStr, out var port))
+        {
+            LogRedirector.Error("PowerWordRelive.Host",
+                "local_mode.local_port is missing or invalid, skipping local web suite");
+            return (null, null);
+        }
+
+        var keyBytes = new byte[32];
+        RandomNumberGenerator.Fill(keyBytes);
+        var keyBase64 = Convert.ToBase64String(keyBytes);
+
+        return (port, keyBase64);
+    }
+
+    private void TryAddRemoteBackend(List<ProcessDefinition> definitions)
+    {
+        if (!_config.TryGetValue("local_backend", out var lbConfig))
+            return;
+
+        if (!lbConfig.TryGetValue("remote_enabled", out var remoteEnabled) || remoteEnabled != "true")
+            return;
+
+        var remoteHost = lbConfig.GetValueOrDefault("remote_host", "");
+        var remotePortStr = lbConfig.GetValueOrDefault("remote_port", "");
+        var keyPath = lbConfig.GetValueOrDefault("key_path", "");
+
+        if (string.IsNullOrEmpty(remoteHost) ||
+            string.IsNullOrEmpty(remotePortStr) ||
+            !int.TryParse(remotePortStr, out var remotePort) ||
+            string.IsNullOrEmpty(keyPath))
+        {
+            LogRedirector.Error("PowerWordRelive.Host",
+                "local_backend.remote_enabled is true but remote_host/remote_port/key_path is missing or invalid");
+            return;
+        }
+
+        if (!_fs.FileExists(keyPath))
+        {
+            LogRedirector.Error("PowerWordRelive.Host",
+                $"Key file not found for remote backend: {keyPath}");
+            return;
+        }
+
+        try
+        {
+            var remoteKeyBase64 = _fs.ReadAllText(keyPath).Trim();
+
+            definitions.Add(new ProcessDefinition(
+                "local_backend_remote", "PowerWordRelive.LocalBackend",
+                new[] { "local_backend", "storage", "general" },
+                $"--mode remote --host {remoteHost} --port {remotePort} --key {remoteKeyBase64}"));
+        }
+        catch (Exception ex)
+        {
+            LogRedirector.Error("PowerWordRelive.Host",
+                $"Failed to read key file for remote backend: {ex.Message}");
         }
     }
 

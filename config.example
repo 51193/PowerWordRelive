@@ -8,6 +8,7 @@ processes.transcribe: PowerWordRelive.Transcribe
 processes.transcription_store: PowerWordRelive.TranscriptionStore
 processes.llm_requester: PowerWordRelive.LLMRequester
 processes.local_backend: PowerWordRelive.LocalBackend
+processes.local_backend_remote: PowerWordRelive.LocalBackend
 
 # 传递给各进程的配置域
 process_config.audio_capture.domains: audio_capture,general
@@ -16,9 +17,13 @@ process_config.transcribe.domains: transcribe,general,modelscope
 process_config.transcription_store.domains: transcription_store,storage,general
 process_config.llm_requester.domains: llm_request,llm,general,storage,text_data
 process_config.local_backend.domains: local_backend,storage,general
+process_config.local_backend_remote.domains: local_backend,storage,general
 
 # 通用配置 — work_root 必须是绝对路径
 general.work_root: /absolute/path/to/work/root
+
+# 本地Web模式
+local_mode.local_port: 9501
 
 # 音频捕获
 audio_capture.output_dir: ./segments
@@ -28,9 +33,6 @@ audio_capture.max_segment_sec: 120
 audio_capture.no_speech_timeout_sec: 30
 audio_capture.min_speech_ms: 500
 # Windows: DirectShow 音频设备名（Linux 下忽略，自动使用 PulseAudio）
-# 默认使用 VB-Cable 虚拟声卡 (https://vb-audio.com/Cable/)，安装后无需修改
-# 若使用其他环回设备，改为对应名称即可
-# 可用 ffmpeg -list_devices true -f dshow -i dummy 查看设备列表
 audio_capture.windows_audio_device: VB-Audio Virtual Cable
 
 # 说话人分离
@@ -66,6 +68,8 @@ llm_request.timer.90: story_progress, task, consistency
 # 窗口限制（兜底上限，独立于具体请求）
 llm_request.window_limits.active_task: 30
 llm_request.window_limits.consistency: 50
+
+# Speaker ID 推断请求参数
 llm_request.speaker_identification.model: deepseek-v4-pro
 llm_request.speaker_identification.thinking_enabled: true
 llm_request.speaker_identification.reasoning_effort: high
@@ -106,10 +110,11 @@ storage.sqlite_path: ./data/pwr.db
 # 文本资料
 text_data.base_dir: text_data/
 
-# 本地后端（连接远端后端）
-local_backend.remote_host: 127.0.0.1
+# 本地后端（连接远端后端，仅 remote_enabled=true 时生效）
+local_backend.remote_enabled: false
+local_backend.remote_host: your.remote.server.com
 local_backend.remote_port: 9500
-local_backend.key_path: ./keys/local_backend.key
+local_backend.key_path: /etc/pwr/local_backend.key
 local_backend.max_reconnect_attempts: 5
 local_backend.initial_reconnect_delay_sec: 2
 
@@ -121,6 +126,4 @@ remote_backend.key_path: /etc/pwr/remote_backend.key
 huggingface.token: 在此填入你的HuggingFace Token
 
 # ModelScope 令牌（可选，但强烈推荐）
-# 不配置会导致 FunASR 模型下载极慢（约 200 KB/s），配置后不限速
-# 获取方法: https://modelscope.cn/my/overview → 个人中心 → 访问控制，创建后填入下方
 modelscope.token: （可选）在此填入你的ModelScope访问令牌

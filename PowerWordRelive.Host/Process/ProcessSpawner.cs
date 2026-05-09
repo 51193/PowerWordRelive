@@ -7,15 +7,19 @@ namespace PowerWordRelive.Host.Process;
 internal class ProcessSpawner
 {
     public static SpawnedProcess Spawn(string processName, string dllPath,
-        Dictionary<string, Dictionary<string, string>> config)
+        Dictionary<string, Dictionary<string, string>> config, string? extraArgs = null)
     {
+        var arguments = $"\"{dllPath}\"";
+        if (!string.IsNullOrWhiteSpace(extraArgs))
+            arguments += " " + extraArgs;
+
         LogRedirector.Info("PowerWordRelive.Host", "Launching child process",
             new { process = processName, dll = dllPath });
 
         var psi = new ProcessStartInfo
         {
             FileName = "dotnet",
-            Arguments = $"\"{dllPath}\"",
+            Arguments = arguments,
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
