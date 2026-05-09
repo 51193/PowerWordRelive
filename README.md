@@ -1,180 +1,192 @@
 # Power Word Relive
 
-实时捕获系统音频，将连续语音切分为按说话人分离的音频片段，转录为文本并入库，通过 LLM 进行说话人识别、对话精炼和故事进展生成，最终通过远端 Web 前端查询结果。
+> 你的 TRPG 跑团 AI 记录员——开着它跑团，自动帮你搞定一切。
 
-## 架构
+## 它能做什么
 
-```
-CLI (PowerWordRelive.CLI)
-  └── Host (PowerWordRelive.Host)
-        ├── AudioCapture ─────── 音频捕获 + VAD 切分
-        ├── SpeakerSplit ─────── 说话人分离
-        ├── Transcribe ───────── 语音转录 (ASR)
-        ├── TranscriptionStore ── SRT 入库 (SQLite)
-        ├── LLMRequester ─────── 说话人识别 + 对话精炼 + 故事进展 (LLM)
-        └── LocalBackend ─────── 远端查询后端 (只读 DB)
+- **自动录音**：捕捉电脑播放的声音，无需额外操作
+- **分辨谁在说话**：自动识别不同玩家的声音，分开记录
+- **语音转文字**：把所有人的对话变成文字
+- **AI 精炼对话**：把啰嗦的口语整理成好看的剧本，去掉闲聊和骰子讨论
+- **追踪故事进展**：AI 自动记录剧情推进到哪里，生成章节概要
+- **管理任务清单**：AI 帮你追踪团队接到的所有任务，该做的、做完的、忘了的、失败的，一目了然
+- **建立世界观词典**：AI 自动记录所有出现的人物、地点、物品，再也不怕忘了 NPC 叫什么
+- **网页查看**：跑完团用浏览器打开，像翻聊天记录一样回顾整场游戏
 
-RemoteBackend (独立运行, ASP.NET Core)
-  ├── WebSocket (/ws/backend) ── 接受 LocalBackend 连接 (AES 认证)
-  ├── WebSocket (/ws/frontend) ─ 接受浏览器连接
-  └── wwwroot/ ───────────────── 静态前端页面
-```
+## 开始使用
 
-## 核心能力
+### 你需要什么
 
-### 1. 语音活动检测（VAD）
+| 东西 | 说明 | 必须？ |
+|------|------|--------|
+| 一台 Linux 电脑 | Ubuntu / Debian 等 | 是 |
+| .NET 10 运行环境 | [下载 .NET 10 Runtime](https://dotnet.microsoft.com/zh-cn/download/dotnet/10.0) | 是 |
+| Python 3.13+ | 系统一般自带，没有的话 `apt install python3` | 是 |
+| ffmpeg | `apt install ffmpeg` | 是 |
+| DeepSeek API Token | 去 [platform.deepseek.com](https://platform.deepseek.com) 注册充值 | 是（AI 功能必需） |
+| HuggingFace Token | 去 [huggingface.co](https://huggingface.co/settings/tokens) 注册（免费）**+ 接受模型使用协议** | 是（说话人分离必需） |
 
-捕获 PulseAudio 桌面音频输出，**实时**将连续语音流按静音间隔切分为独立的语句片段，输出为 16kHz 单声道 WAV 文件。文件名以 UTC 时间戳标记，便于后续按序处理。
+### 第一步：下载
 
-### 2. 说话人分离（Speaker Diarization）
-
-将语句片段进一步拆分为按说话人区分的子片段：
-- **单人语句**：识别该段所属的说话人 ID，输出为 `时间戳+SpeakerID.wav`
-- **多人语句**：将每段切分后按说话人输出为 `时间戳+偏移量+SpeakerID.wav`
-- **跨会话识别**：说话人声纹持久化（`.npy` 文件），同一说话人在不同会话中可被识别为同一 ID
-
-### 3. 语音转录（ASR）
-
-将说话人分离后的音频片段转录为字幕文本：
-- 使用 FunASR Paraformer 模型
-- 以长驻服务方式运行，模型只加载一次
-- 输出为 SRT 字幕格式，与原输入文件名对应（1:1）
-- 支持 CUDA 加速
-
-### 4. 转录入库（TranscriptionStore）
-
-将 SRT 字幕文件解析后写入 SQLite 数据库，建立 `transcriptions` 和 `speaker_mappings` 表。
-
-### 5. LLM 请求引擎（LLMRequester）
-
-通过定时器驱动，对数据库内容进行 LLM 增强：
-- **说话人识别**：将未确认的 speaker ID 发送给 LLM，根据角色卡和上下文推断角色名
-- **对话精炼**：将转录文本结合已有精炼结果窗，由 LLM 输出增删改操作，存储在 `refinement_results` 表中
-- **故事进展**：基于精炼结果，由 LLM 维护章节梗概式叙事，存储在 `story_progress` 表中
-- 精炼表和故事进展表使用浮点主键，支持插入式排序
-
-### 6. 远端查询前端（RemoteBackend + LocalBackend）
-
-- **LocalBackend**：由 Host 拉起，通过 WebSocket 连接到 RemoteBackend，提供 SQLite 只读查询
-- **RemoteBackend**：独立 ASP.NET Core 服务，接受一条 LocalBackend 连接，将浏览器请求转发到 LocalBackend
-- 浏览器端展示精炼结果，支持微信聊天式消息面板、按角色过滤
-- 连接通过 AES-256 challenge-response 认证
-
-## 快速开始
-
-### 环境要求
-
-- .NET 10 SDK
-- Python 3.13+
-- ffmpeg（用于音频编解码）
-- PulseAudio（用于桌面音频捕获）
-
-### 安装
+去 [Releases 页面](../../releases) 下载最新版的 `pwr-main-xxx-linux-x64.tar.gz`。
 
 ```bash
-# 1. 构建项目
-dotnet build
-
-# 2. 初始化 Python 虚拟环境（仅在首次或依赖变更后执行）
-out/setup.sh
+# 找个你喜欢的地方解压
+tar -xzf pwr-main-*-linux-x64.tar.gz
+cd PowerWordRelive  # 解压后的目录
 ```
 
-### 配置
+### 第二步：初始化
 
-复制并编辑 `config` 文件（首次使用从 `config.example` 复制）：
+```bash
+# 运行初始化脚本（下载 AI 模型，需要联网，大约需要 2GB 磁盘空间）
+bash setup.sh
+```
 
-```ini
-# ── 进程定义 ──
-processes.audio_capture: PowerWordRelive.AudioCapture
-processes.speaker_split: PowerWordRelive.SpeakerSplit
-processes.transcribe: PowerWordRelive.Transcribe
-processes.transcription_store: PowerWordRelive.TranscriptionStore
-processes.llm_requester: PowerWordRelive.LLMRequester
-processes.local_backend: PowerWordRelive.LocalBackend
+> 如果卡住了：模型下载可能需要几分钟到十几分钟，取决于网速。出现"初始化完成"就说明好了。
 
-# ── 进程配置域 ──
-process_config.audio_capture.domains: audio_capture,general
-process_config.speaker_split.domains: speaker_split,general,huggingface
-process_config.transcribe.domains: transcribe,general
-process_config.transcription_store.domains: transcription_store,storage,general
-process_config.llm_requester.domains: llm_request,llm,general,storage,text_data
-process_config.local_backend.domains: local_backend,storage,general
+### 第三步：配置
 
-# ── 通用 ──
-general.work_root: /absolute/path/to/work/root
+解压后的目录里有个 `config` 文件，用文本编辑器打开它。**你只需要改这几行：**
 
-# ── 各模块配置 ──
-audio_capture.output_dir: ./segments
-speaker_split.input_dir: ./segments
-speaker_split.output_dir: ./speaker_segments
-transcribe.input_dir: ./speaker_segments
-transcribe.output_dir: ./transcriptions
-transcription_store.input_dir: ./transcriptions
-storage.sqlite_path: ./data/pwr.db
+```
+# 工作目录：所有录音、文字、数据库都会放到这个目录下
+# 必须是绝对路径，而且目录要存在
+general.work_root: /home/你的用户名/trpg-data
 
-# ── LLM ──
-llm.token: sk-your_token_here
+# DeepSeek API Token：去 platform.deepseek.com 注册充值后获取
+llm.token: sk-xxxxxxxxxxxxxxxx
+
+# HuggingFace Token：去 huggingface.co/settings/tokens 创建（免费的）
+huggingface.token: hf_xxxxxxxxxxxxxxxx
+```
+
+> **关于 HuggingFace Token**：光注册 HuggingFace 账号还不够。这个项目使用的说话人分离模型（pyannote/speaker-diarization-3.1）是一个受限模型，需要在网页上接受使用协议才能下载。完整步骤如下：
+>
+> 1. 注册 HuggingFace 账号：[huggingface.co/join](https://huggingface.co/join)
+> 2. 打开 https://huggingface.co/pyannote/speaker-diarization-3.1 ，点"Agree and access repository"
+> 3. 页面会弹一个简单的小问卷，随便填一下就行（不影响使用）
+> 4. 去 https://huggingface.co/settings/tokens 创建一个 Access Token（类型选"Fine-grained"）
+> 5. 把生成的 Token 填到上面 `huggingface.token` 那一行
+
+其他所有配置项保持默认即可，不需要动。
+
+> 也可以参考 `config.example` 查看所有可配置项的说明。
+
+### 第四步：运行
+
+```bash
+dotnet PowerWordRelive.CLI/PowerWordRelive.CLI.dll
+```
+
+启动后，系统就开始自动捕捉电脑声音了。你正常跑团就行。
+
+**按 `Ctrl+C` 停止**，所有录音、文字、AI 结果都会保存在你配置的工作目录里。
+
+## 跑完之后看什么
+
+在你配的 `general.work_root` 目录下：
+
+```
+work_root/
+├── data/pwr.db              # SQLite 数据库，所有 AI 处理结果都在这里
+├── segments/                # 原始录音片段（VAD 切出来的）
+├── speaker_segments/        # 按说话人分好的录音文件
+└── transcriptions/          # 文字转录结果
+```
+
+### 用网页查看
+
+如果你有台服务器，可以把网页前端部署上去，用浏览器查看所有内容——像翻聊天记录一样，还能按角色筛选、翻看任务列表、查看世界观词典。
+
+部署方法见下方"服务器部署"一节。
+
+## 配置参考
+
+以下是 `config` 文件中**你可能关心的配置项**。没有列在这里的都是内部参数，保持默认就好。
+
+### 工作目录
+
+```
+# 所有输出都放在这里，必须是绝对路径，必须已存在
+general.work_root: /home/你/trpg-data
+```
+
+### LLM（AI 模型）
+
+```
+# 你的 DeepSeek API Token（必填）
+llm.token: sk-xxxxxxxxxxxxxxxx
+# API 地址（不用改）
 llm.api_url: https://api.deepseek.com/v1/chat/completions
-llm_request.timer.45: speaker_identification,refinement
-llm_request.timer.90: story_progress
-llm_request.speaker_identification.model: deepseek-v4-pro
-llm_request.refinement.model: deepseek-v4-flash
-llm_request.story_progress.model: deepseek-v4-flash
-
-# ── HuggingFace Token ──
-huggingface.token: hf_your_token_here
-
-# ── 本地后端 (连接远端后端) ──
-local_backend.remote_host: 127.0.0.1
-local_backend.remote_port: 9500
-local_backend.key_path: ./keys/local_backend.key
-local_backend.max_reconnect_attempts: 5
-local_backend.initial_reconnect_delay_sec: 2
-
-# ── 远端后端 (独立运行) ──
-remote_backend.port: 9500
-remote_backend.key_path: /etc/pwr/remote_backend.key
 ```
 
-### 运行
+### 录音相关
+
+```
+# 录音采样率，一般不用改
+audio_capture.sample_rate: 16000
+# 静音多少毫秒算一段话结束（数值越小切得越碎）
+audio_capture.silence_timeout_ms: 800
+# 最长一段录音秒数，超过会被强制切开
+audio_capture.max_segment_sec: 120
+```
+
+### HuggingFace（必填）
+
+```
+# HuggingFace Token
+huggingface.token: 在此填入你的HuggingFace Token
+```
+
+这个项目使用 pyannote 的 [speaker-diarization-3.1](https://huggingface.co/pyannote/speaker-diarization-3.1) 模型进行说话人分离。该模型是受限模型，除了注册账号、创建 Token 之外，还需要**手动接受使用协议**：
+
+1. 打开 https://huggingface.co/pyannote/speaker-diarization-3.1 → 点"Agree and access repository"
+2. 填一个小问卷（随便填）
+3. 去 https://huggingface.co/settings/tokens 创建 Access Token（Fine-grained 类型即可）
+4. 把 Token 填到 `huggingface.token`
+
+没有 Token 或没有接受协议，说话人分离流水线会无法启动。
+
+## 服务器部署
+
+如果你想在网页上查看游戏记录（比如边跑团边用手机看），需要部署服务器端。一台有公网 IP 的服务器就行。
+
+### 1. 在服务器上下载 RemoteBackend 包
+
+去 [Releases 页面](../../releases) 下载 `pwr-remote-xxx-linux-x64.tar.gz`。
 
 ```bash
-# 本地启动全部进程
-out/PowerWordRelive.CLI/PowerWordRelive.CLI
+tar -xzf pwr-remote-*-linux-x64.tar.gz
+cd PowerWordRelive.RemoteBackend
 ```
 
-使用 `Ctrl+C` 优雅退出，所有子进程会被自动清理。
+### 2. 生成密钥
 
-## 远端前端部署
-
-RemoteBackend 是一个独立的 ASP.NET Core 服务，部署在远端服务器上，不在 Host 的管理范围内。
-
-### 1. 生成加密密钥
+在你的**本地电脑**上：
 
 ```bash
 bash scripts/generate_key.sh
+# 会输出一串密钥，复制它
 ```
 
-### 2. 部署密钥
-
-将生成的密钥分别放置到两端：
+### 3. 部署密钥
 
 ```bash
-# 远端服务器 — 固定路径
-mkdir -p /etc/pwr
-echo "<生成的密钥>" > /etc/pwr/remote_backend.key
-chmod 600 /etc/pwr/remote_backend.key
+# 在服务器上：
+echo "刚才复制的密钥" | sudo tee /etc/pwr/remote_backend.key
+sudo chmod 600 /etc/pwr/remote_backend.key
 
-# 本地机器 — 路径由 config 中的 local_backend.key_path 指定
-mkdir -p ./keys
-echo "<生成的密钥>" > ./keys/local_backend.key
+# 在本地电脑上（在 PowerWordRelive 目录下）：
+mkdir -p keys
+echo "刚才复制的密钥" > keys/local_backend.key
 ```
 
-### 3. 远端服务器：配置并启动 RemoteBackend
+### 4. 配置并启动服务端
 
-在 `out/PowerWordRelive.RemoteBackend/` 下放置 `config` 文件：
+编辑服务器上的 `config` 文件：
 
-```ini
+```
 remote_backend.port: 9500
 remote_backend.key_path: /etc/pwr/remote_backend.key
 ```
@@ -182,50 +194,121 @@ remote_backend.key_path: /etc/pwr/remote_backend.key
 启动：
 
 ```bash
-cd out/PowerWordRelive.RemoteBackend
 dotnet PowerWordRelive.RemoteBackend.dll
 ```
 
-### 4. 本地：配置 LocalBackend 并启动 Host
+### 5. 配置本地连接服务端
 
-确保 `config` 中 `local_backend.*` 配置项指向正确的远端地址和密钥路径，然后：
+在本地电脑的 `config` 中修改：
+
+```
+local_backend.remote_host: 你服务器的IP
+local_backend.remote_port: 9500
+local_backend.key_path: ./keys/local_backend.key
+```
+
+然后正常启动本地程序。启动后在浏览器打开 `http://服务器IP:9500` 即可查看。
+
+### 6. 保持服务端长期运行（可选）
+
+可以用 `systemd` 或 `screen` 让服务端在后台一直运行。
+
+## 常见问题
+
+### Q: 启动时报错"找不到 config"
+A: 确认你在解压后的目录里运行命令，且该目录下有 `config` 文件。
+
+### Q: 说话人分离不工作？
+A: 99% 是因为 HuggingFace Token 没配好，或者没有接受模型使用协议。重新检查上面"HuggingFace（必填）"那段里的步骤，特别是第 1、2 步——光有 Token 不够，必须去模型页面点"Agree and access repository"才能下载模型。
+
+### Q: AI 精炼结果质量不好？
+A: 可以在 `config` 中把 `llm_request.refinement.model` 从 `deepseek-v4-flash` 改成 `deepseek-v4-pro`（更贵但更好）。
+
+### Q: 提示"Python not found"
+A: 确保系统装了 Python 3.13+：`python3 --version`。如果没装：`apt install python3 python3-venv`。
+
+### Q: 提示"ffmpeg not found"
+A: `apt install ffmpeg`
+
+### Q: 数据库里看不到数据？
+A: 先确认录音正常（看 `segments/` 目录下有没有 wav 文件）。如果有 wav 但没有文字，可能是 ASR 模型没下载好：重新运行 `bash setup.sh`。
+
+---
+
+## 进阶：从源码构建
+
+这部分适合想自己改代码或参与开发的人。普通用户不看这个也能正常使用。
+
+### 环境要求
+
+- .NET 10 SDK
+- Python 3.13+
+- ffmpeg
+
+### 构建
 
 ```bash
-out/PowerWordRelive.CLI/PowerWordRelive.CLI
+git clone <项目地址>
+cd PowerWordRelive
+dotnet build
+out/setup.sh
 ```
 
-### 5. 访问前端
+### 运行测试
 
-浏览器打开 `http://<remote_host>:<remote_backend.port>`
-
-## 输出结构
-
-```
-<work_root>/
-├── segments/                     # VAD 切分的语句片段
-│   └── 20260506_120000_000000.wav
-├── speaker_segments/             # 说话人分离后的音频
-│   ├── 20260506_120000_000000+speaker_0.wav
-│   └── 20260506_120000_000000+00000+speaker_1.wav
-├── speaker_embeddings/           # 持久化声纹
-│   └── speaker_0.npy
-├── transcriptions/               # ASR 转录字幕 (SRT)
-│   └── 20260506_120000_000000+speaker_0.srt
-└── data/
-    └── pwr.db                    # SQLite 数据库
-        ├── transcriptions        # 转录条目
-        ├── speaker_mappings      # 说话人 → 角色名映射
-        ├── refinement_results    # LLM 精炼对话
-        └── story_progress        # LLM 故事进展
+```bash
+dotnet test
 ```
 
-## 性能
+### 打包
 
-说话人分离使用 pyannote speaker-diarization-3.1 模型。首次运行会从 HuggingFace 下载模型（约 32MB）到 `out/cache/huggingface/`。
+```bash
+bash scripts/package.sh
+# 产物在 out/pkg/ 下
+```
 
-在处理约 20 条以上文件后，累计处理速度通常能达到实时或快于实时（speed ≥ 1.0）。
+### 内部架构
 
-可通过调整 `speaker_split` 域下的参数优化 CPU 性能：
-- `omp_num_threads`：PyTorch 线程数（默认 8）
-- `segmentation_batch_size`：分段批处理大小（默认 64）
-- `embedding_batch_size`：声纹批处理大小（默认 64，增大可提升吞吐量但增加内存占用）
+```
+CLI（用户入口）
+  └── Host（进程管理器）
+        ├── AudioCapture      # 录音 + 语音分段
+        ├── SpeakerSplit      # 说话人分离
+        ├── Transcribe        # 语音转文字
+        ├── TranscriptionStore # 写入数据库
+        ├── LLMRequester      # AI 处理（说话人识别、对话精炼、故事进展、任务、一致性表）
+        └── LocalBackend      # 网页查询后端
+
+RemoteBackend（独立 ASP.NET 服务）
+  ├── 接受 LocalBackend 连接（加密）
+  └── 提供网页前端
+```
+
+LLMRequester 内部维护 5 种 AI 请求，按定时器循环触发：
+
+| 请求 | 作用 | 周期 |
+|------|------|------|
+| `speaker_identification` | 根据对话内容推断说话人角色名 | 45s |
+| `refinement` | 把口语对话精炼成剧本 | 45s |
+| `story_progress` | 生成章节梗概式故事进展 | 90s |
+| `task` | 管理任务清单（进行中/完成/失败/放弃） | 90s |
+| `consistency` | 维护人物/地点/物品的世界观词典 | 90s |
+
+### 项目结构
+
+```
+PowerWordRelive/
+├── PowerWordRelive.CLI/               # 用户入口
+├── PowerWordRelive.Host/              # 进程管理器
+├── PowerWordRelive.Infrastructure/    # 共享库
+├── PowerWordRelive.AudioCapture/      # 录音模块
+├── PowerWordRelive.SpeakerSplit/      # 说话人分离
+├── PowerWordRelive.Transcribe/        # 语音转文字
+├── PowerWordRelive.TranscriptionStore/ # 数据库写入
+├── PowerWordRelive.LLMRequester/      # AI 请求引擎
+├── PowerWordRelive.LocalBackend/      # 网页查询后端
+├── PowerWordRelive.RemoteBackend/     # 网页服务端
+├── scripts/                           # Python 脚本 + 初始化 + CI
+├── text_data/                         # AI 提示词模板 + 角色卡
+└── test/                              # 测试音频和输出
+```
