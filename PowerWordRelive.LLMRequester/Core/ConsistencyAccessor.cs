@@ -8,9 +8,9 @@ namespace PowerWordRelive.LLMRequester.Core;
 public class ConsistencyAccessor
 {
     private const string EmptyStateMarker = "__EMPTY__";
+    private readonly int _consistencyLimit;
 
     private readonly LLMDatabase _db;
-    private readonly int _consistencyLimit;
 
     public ConsistencyAccessor(LLMDatabase db, int consistencyLimit)
     {

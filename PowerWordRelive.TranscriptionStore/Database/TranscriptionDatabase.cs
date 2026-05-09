@@ -19,6 +19,12 @@ internal class TranscriptionDatabase : IDisposable
         EnsureSchema();
     }
 
+    public void Dispose()
+    {
+        _connection.Close();
+        _connection.Dispose();
+    }
+
     private void EnsureSchema()
     {
         using var cmd = _connection.CreateCommand();
@@ -86,11 +92,5 @@ internal class TranscriptionDatabase : IDisposable
         }
 
         tx.Commit();
-    }
-
-    public void Dispose()
-    {
-        _connection.Close();
-        _connection.Dispose();
     }
 }

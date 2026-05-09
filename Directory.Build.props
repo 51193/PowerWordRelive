@@ -1,6 +1,7 @@
 <Project>
     <PropertyGroup>
         <RepoRoot>$(MSBuildThisFileDirectory)</RepoRoot>
+        <Version>0.0.0</Version>
         <OutputPath Condition="!$(MSBuildProjectName.EndsWith('Tests'))">$(RepoRoot)out/$(MSBuildProjectName)/</OutputPath>
         <CommonOutputDir>$(RepoRoot)out/</CommonOutputDir>
         <AppendTargetFrameworkToOutputPath Condition="!$(MSBuildProjectName.EndsWith('Tests'))">false</AppendTargetFrameworkToOutputPath>

@@ -19,17 +19,17 @@ internal class StoryProgressRequest : IRequest
 #if DEBUG
     private static readonly object StoryProgressLogLock = new();
 #endif
+    private readonly LlmApiClient _apiClient;
 
     private readonly string _apiUrl;
-    private readonly string _token;
-    private readonly LLMDatabase _db;
-    private readonly StoryProgressContainer _container;
-    private readonly RefinementContainer _refContainer;
-    private readonly ConsistencyAccessor _consistencyAccessor;
     private readonly PromptAssembler _assembler;
     private readonly StoryProgressConfig _config;
-    private readonly LlmApiClient _apiClient;
+    private readonly ConsistencyAccessor _consistencyAccessor;
+    private readonly StoryProgressContainer _container;
+    private readonly LLMDatabase _db;
     private readonly StoryProgressParser _parser = new();
+    private readonly RefinementContainer _refContainer;
+    private readonly string _token;
 
     public StoryProgressRequest(
         string apiUrl,

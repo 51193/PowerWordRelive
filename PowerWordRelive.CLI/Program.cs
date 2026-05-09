@@ -34,10 +34,7 @@ Console.CancelKeyPress += (_, e) =>
     ShutdownHost(process);
 };
 
-PosixSignalRegistration.Create(PosixSignal.SIGTERM, _ =>
-{
-    ShutdownHost(process);
-});
+PosixSignalRegistration.Create(PosixSignal.SIGTERM, _ => { ShutdownHost(process); });
 
 static void ShutdownHost(Process hostProcess)
 {

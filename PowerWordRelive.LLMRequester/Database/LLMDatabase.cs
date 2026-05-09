@@ -21,6 +21,12 @@ public class LLMDatabase : IDisposable
         pragma.ExecuteNonQuery();
     }
 
+    public void Dispose()
+    {
+        _connection.Close();
+        _connection.Dispose();
+    }
+
     public List<SpeakerMapping> GetUnassignedSpeakers()
     {
         var list = new List<SpeakerMapping>();
@@ -555,11 +561,5 @@ public class LLMDatabase : IDisposable
 
         var result = cmd.ExecuteScalar();
         return result is DBNull or null ? null : Convert.ToInt32(result);
-    }
-
-    public void Dispose()
-    {
-        _connection.Close();
-        _connection.Dispose();
     }
 }

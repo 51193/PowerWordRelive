@@ -5,8 +5,8 @@ namespace PowerWordRelive.LLMRequester.Core;
 
 public class LoggingRequestDecorator : IRequest
 {
-    private readonly string _key;
     private readonly IRequest _inner;
+    private readonly string _key;
 
     public LoggingRequestDecorator(string key, IRequest inner)
     {

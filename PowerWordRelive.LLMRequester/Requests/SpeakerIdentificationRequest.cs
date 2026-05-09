@@ -16,13 +16,13 @@ internal class SpeakerIdentificationRequest : IRequest
     private const int MaxClustersBeforeSampling = 15;
     private const int HeadKeep = 3;
     private const int TailKeep = 12;
+    private readonly LlmApiClient _apiClient;
 
     private readonly string _apiUrl;
-    private readonly string _token;
-    private readonly LLMDatabase _db;
     private readonly PromptAssembler _assembler;
     private readonly SpeakerIdentificationConfig _config;
-    private readonly LlmApiClient _apiClient;
+    private readonly LLMDatabase _db;
+    private readonly string _token;
 
     public SpeakerIdentificationRequest(
         string apiUrl,

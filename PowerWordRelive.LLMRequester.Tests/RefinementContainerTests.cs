@@ -7,9 +7,9 @@ namespace PowerWordRelive.LLMRequester.Tests;
 
 public class RefinementContainerTests : IDisposable
 {
-    private readonly string _dbPath;
-    private readonly LLMDatabase _db;
     private readonly RefinementContainer _container;
+    private readonly LLMDatabase _db;
+    private readonly string _dbPath;
 
     public RefinementContainerTests()
     {

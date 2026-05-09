@@ -7,14 +7,6 @@ public abstract class IncrementalListContainer : IIncrementalContainer<string>
 {
     protected readonly List<double> Ids = new();
 
-    protected abstract List<(double Id, string Content)> GetWindowFromDb(int count);
-    protected abstract string FormatEntryForDisplay(double id, string content);
-    protected abstract double GetNextIdInDb(double afterId);
-    protected abstract double GetMaxIdInDb();
-    protected abstract void InsertToDb(double id, string content);
-    protected abstract void UpdateToDb(double id, string content);
-    protected abstract void DeleteFromDb(double id);
-
     public IReadOnlyList<string> Get(int count)
     {
         if (count <= 0)
@@ -97,4 +89,12 @@ public abstract class IncrementalListContainer : IIncrementalContainer<string>
 
         UpdateToDb(Ids[idx], newContent);
     }
+
+    protected abstract List<(double Id, string Content)> GetWindowFromDb(int count);
+    protected abstract string FormatEntryForDisplay(double id, string content);
+    protected abstract double GetNextIdInDb(double afterId);
+    protected abstract double GetMaxIdInDb();
+    protected abstract void InsertToDb(double id, string content);
+    protected abstract void UpdateToDb(double id, string content);
+    protected abstract void DeleteFromDb(double id);
 }

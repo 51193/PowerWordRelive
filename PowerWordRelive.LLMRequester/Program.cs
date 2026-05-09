@@ -60,15 +60,12 @@ if (!fs.DirectoryExists(textDataBaseDir))
 }
 
 if (!fs.FileExists(sqlitePath))
-{
     LogRedirector.Warn("PowerWordRelive.LLMRequester",
         $"SQLite database not yet available: {sqlitePath}, will wait for producer");
-}
 
 var timerIntervals = new Dictionary<TimeSpan, List<string>>();
 
 foreach (var (k, v) in llmRequestConfig)
-{
     if (k.StartsWith("timer."))
     {
         var intervalStr = k["timer.".Length..];
@@ -98,7 +95,6 @@ foreach (var (k, v) in llmRequestConfig)
         foreach (var key in keys)
             list.Add(key);
     }
-}
 
 var distinctKeys = timerIntervals.Values
     .SelectMany(l => l).Distinct().ToList();

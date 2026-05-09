@@ -23,16 +23,16 @@ internal class RefinementRequest : IRequest
 #if DEBUG
     private static readonly object RefineLogLock = new();
 #endif
+    private readonly LlmApiClient _apiClient;
 
     private readonly string _apiUrl;
-    private readonly string _token;
-    private readonly LLMDatabase _db;
-    private readonly RefinementContainer _container;
-    private readonly ConsistencyAccessor _consistencyAccessor;
     private readonly PromptAssembler _assembler;
     private readonly RefinementConfig _config;
-    private readonly LlmApiClient _apiClient;
+    private readonly ConsistencyAccessor _consistencyAccessor;
+    private readonly RefinementContainer _container;
+    private readonly LLMDatabase _db;
     private readonly RefinementParser _parser = new();
+    private readonly string _token;
 
     public RefinementRequest(
         string apiUrl,

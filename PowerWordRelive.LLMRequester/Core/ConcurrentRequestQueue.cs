@@ -7,9 +7,9 @@ public class ConcurrentRequestQueue
 {
     private const int DuplicateWarnThreshold = 3;
     private static readonly TimeSpan StuckWarnThreshold = TimeSpan.FromMinutes(5);
+    private readonly ConcurrentDictionary<string, int> _duplicates = new();
 
     private readonly ConcurrentQueue<string> _queue = new();
-    private readonly ConcurrentDictionary<string, int> _duplicates = new();
     private readonly ManualResetEventSlim _signal = new(false);
     private readonly object _stuckLock = new();
     private DateTime? _firstEnqueueAt;

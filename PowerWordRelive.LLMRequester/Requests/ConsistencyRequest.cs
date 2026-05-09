@@ -18,18 +18,18 @@ internal class ConsistencyRequest : IRequest
 #if DEBUG
     private static readonly object ConsistencyLogLock = new();
 #endif
+    private readonly LlmApiClient _apiClient;
 
     private readonly string _apiUrl;
-    private readonly string _token;
+    private readonly PromptAssembler _assembler;
+    private readonly ConsistencyConfig _config;
+    private readonly ConsistencyAccessor _consistencyAccessor;
     private readonly LLMDatabase _db;
+    private readonly ConsistencyParser _parser = new();
     private readonly RefinementContainer _refContainer;
     private readonly StoryProgressContainer _spContainer;
     private readonly TaskAccessor _taskAccessor;
-    private readonly ConsistencyAccessor _consistencyAccessor;
-    private readonly PromptAssembler _assembler;
-    private readonly ConsistencyConfig _config;
-    private readonly LlmApiClient _apiClient;
-    private readonly ConsistencyParser _parser = new();
+    private readonly string _token;
 
     public ConsistencyRequest(
         string apiUrl,

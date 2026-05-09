@@ -11,9 +11,9 @@ namespace PowerWordRelive.LocalBackend.Services;
 
 public class RemoteConnectionService
 {
-    private readonly LocalBackendOptions _options;
     private readonly IFileSystem _fs;
     private readonly byte[] _key;
+    private readonly LocalBackendOptions _options;
 
     public RemoteConnectionService(LocalBackendOptions options, IFileSystem fs)
     {
@@ -112,12 +112,10 @@ public class RemoteConnectionService
         var dict = new Dictionary<string, string>();
         if (rawParams != null)
             foreach (var prop in rawParams.Value.EnumerateObject())
-            {
                 if (prop.Value.ValueKind == JsonValueKind.Number && prop.Value.TryGetInt32(out var v))
                     dict[prop.Name] = v.ToString();
                 else if (prop.Value.ValueKind == JsonValueKind.String)
                     dict[prop.Name] = prop.Value.GetString() ?? "";
-            }
 
         var limit = int.TryParse(dict.GetValueOrDefault("limit", "50"), out var l) ? l : 50;
         var offset = int.TryParse(dict.GetValueOrDefault("offset", "0"), out var o) ? o : 0;

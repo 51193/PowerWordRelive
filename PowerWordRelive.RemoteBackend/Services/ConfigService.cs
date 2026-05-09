@@ -4,9 +4,6 @@ namespace PowerWordRelive.RemoteBackend.Services;
 
 public class ConfigService
 {
-    public int Port { get; }
-    public string KeyPath { get; }
-
     public ConfigService(IFileSystem fs)
     {
         var configPath = Path.Combine(AppContext.BaseDirectory, "config");
@@ -28,6 +25,9 @@ public class ConfigService
         Port = ParseInt(remote, "port", "remote_backend.port");
         KeyPath = ParseRequired(remote, "key_path", "remote_backend.key_path");
     }
+
+    public int Port { get; }
+    public string KeyPath { get; }
 
     private static Dictionary<string, Dictionary<string, string>> ParseConfig(string[] lines)
     {

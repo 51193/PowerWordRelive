@@ -9,13 +9,13 @@ public record ConsistencyOperation
         Edit
     }
 
-    public OperationType Type { get; init; }
-    public string? Name { get; init; }
-    public string? Detail { get; init; }
-
     private ConsistencyOperation()
     {
     }
+
+    public OperationType Type { get; init; }
+    public string? Name { get; init; }
+    public string? Detail { get; init; }
 
     public static ConsistencyOperation Append(string name, string detail)
     {

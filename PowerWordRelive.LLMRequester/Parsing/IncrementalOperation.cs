@@ -10,13 +10,13 @@ public record IncrementalOperation
         Edit
     }
 
-    public OperationType Type { get; init; }
-    public int? DisplayIndex { get; init; }
-    public string? Content { get; init; }
-
     private IncrementalOperation()
     {
     }
+
+    public OperationType Type { get; init; }
+    public int? DisplayIndex { get; init; }
+    public string? Content { get; init; }
 
     public static IncrementalOperation Insert(int displayIndex, string content)
     {

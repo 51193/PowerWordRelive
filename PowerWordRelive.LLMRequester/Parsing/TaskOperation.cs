@@ -11,15 +11,15 @@ public record TaskOperation
         Finish
     }
 
+    private TaskOperation()
+    {
+    }
+
     public OperationType Type { get; init; }
     public string? Key { get; init; }
     public string? NewKey { get; init; }
     public string? Value { get; init; }
     public string? Status { get; init; }
-
-    private TaskOperation()
-    {
-    }
 
     public static TaskOperation Append(string key, string value)
     {

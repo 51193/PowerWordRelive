@@ -10,11 +10,18 @@ namespace PowerWordRelive.RemoteBackend.Services;
 
 public class BackendConnectionManager
 {
-    private WebSocket? _backendSocket;
-    private readonly object _gate = new();
     private readonly ConcurrentDictionary<string, WebSocket> _frontendClients = new();
+    private readonly object _gate = new();
     private readonly byte[] _key;
     private readonly ILogger<BackendConnectionManager> _logger;
+    private WebSocket? _backendSocket;
+
+    public BackendConnectionManager(string keyPath, IFileSystem fs, ILogger<BackendConnectionManager> logger)
+    {
+        _logger = logger;
+        var keyBase64 = fs.ReadAllText(keyPath).Trim();
+        _key = Convert.FromBase64String(keyBase64);
+    }
 
     public bool IsConnected
     {
@@ -25,13 +32,6 @@ public class BackendConnectionManager
                 return _backendSocket != null;
             }
         }
-    }
-
-    public BackendConnectionManager(string keyPath, IFileSystem fs, ILogger<BackendConnectionManager> logger)
-    {
-        _logger = logger;
-        var keyBase64 = fs.ReadAllText(keyPath).Trim();
-        _key = Convert.FromBase64String(keyBase64);
     }
 
     public async Task HandleBackendWebSocket(HttpContext context)

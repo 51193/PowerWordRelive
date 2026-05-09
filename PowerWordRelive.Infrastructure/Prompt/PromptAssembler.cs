@@ -9,8 +9,8 @@ public class PromptAssembler
     private static readonly Regex PlaceholderRegex = new(@"\{\{(.+?)\}\}", RegexOptions.Compiled);
 
     private readonly IFileSystem _fs;
-    private readonly string _promptBaseDir;
     private readonly int _maxDepth;
+    private readonly string _promptBaseDir;
 
     public PromptAssembler(IFileSystem fs, string promptBaseDir, int maxDepth = 10)
     {

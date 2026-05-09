@@ -8,9 +8,9 @@ namespace PowerWordRelive.LLMRequester.Core;
 public class TaskAccessor
 {
     private const string EmptyStateMarker = "__EMPTY__";
+    private readonly int _activeTaskLimit;
 
     private readonly LLMDatabase _db;
-    private readonly int _activeTaskLimit;
 
     public TaskAccessor(LLMDatabase db, int activeTaskLimit)
     {

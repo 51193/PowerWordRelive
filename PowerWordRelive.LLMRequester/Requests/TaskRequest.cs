@@ -18,18 +18,18 @@ internal class TaskRequest : IRequest
 #if DEBUG
     private static readonly object TaskLogLock = new();
 #endif
+    private readonly LlmApiClient _apiClient;
 
     private readonly string _apiUrl;
-    private readonly string _token;
+    private readonly PromptAssembler _assembler;
+    private readonly TaskConfig _config;
+    private readonly ConsistencyAccessor _consistencyAccessor;
     private readonly LLMDatabase _db;
+    private readonly TaskParser _parser = new();
     private readonly RefinementContainer _refContainer;
     private readonly StoryProgressContainer _spContainer;
     private readonly TaskAccessor _taskAccessor;
-    private readonly ConsistencyAccessor _consistencyAccessor;
-    private readonly PromptAssembler _assembler;
-    private readonly TaskConfig _config;
-    private readonly LlmApiClient _apiClient;
-    private readonly TaskParser _parser = new();
+    private readonly string _token;
 
     public TaskRequest(
         string apiUrl,

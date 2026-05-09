@@ -95,7 +95,7 @@ public class PromptAssemblerTests
     {
         var fs = new InMemoryFileSystem();
         fs.AddFile("/prompts/deep.md", "{{dir:deep.md}}");
-        var assembler = new PromptAssembler(fs, BaseDir, maxDepth: 3);
+        var assembler = new PromptAssembler(fs, BaseDir, 3);
         var vars = new Dictionary<string, string>();
 
         var ex = Assert.Throws<InvalidPromptException>(() =>
@@ -264,7 +264,7 @@ public class PromptAssemblerTests
         var fs = new InMemoryFileSystem();
         fs.AddFile("/prompts/l1.md", "{{dir:l2.md}}");
         fs.AddFile("/prompts/l2.md", "leaf");
-        var assembler = new PromptAssembler(fs, BaseDir, maxDepth: 1);
+        var assembler = new PromptAssembler(fs, BaseDir, 1);
         var vars = new Dictionary<string, string>();
 
         var result = assembler.Assemble("l1.md", vars);
@@ -279,7 +279,7 @@ public class PromptAssemblerTests
         fs.AddFile("/prompts/l1.md", "{{dir:l2.md}}");
         fs.AddFile("/prompts/l2.md", "{{dir:l3.md}}");
         fs.AddFile("/prompts/l3.md", "leaf");
-        var assembler = new PromptAssembler(fs, BaseDir, maxDepth: 1);
+        var assembler = new PromptAssembler(fs, BaseDir, 1);
         var vars = new Dictionary<string, string>();
 
         Assert.Throws<InvalidPromptException>(() =>
@@ -295,7 +295,8 @@ public class PromptAssemblerTests
             var to = i < 7 ? $"{{{{dir:l{i + 1}.md}}}}" : "leaf";
             fs.AddFile($"/prompts/l{i}.md", to);
         }
-        var assembler = new PromptAssembler(fs, BaseDir, maxDepth: 5);
+
+        var assembler = new PromptAssembler(fs, BaseDir, 5);
         var vars = new Dictionary<string, string>();
 
         var ex = Assert.Throws<InvalidPromptException>(() =>
