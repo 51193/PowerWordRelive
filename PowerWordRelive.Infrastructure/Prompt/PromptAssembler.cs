@@ -73,7 +73,11 @@ public class PromptAssembler
                 foreach (var file in files)
                 {
                     var text = _fs.ReadAllText(file).TrimEnd();
-                    sb.AppendLine(text);
+                    // Hardcoded \n instead of Environment.NewLine because this
+                    // output is consumed by LLM APIs and other platform-agnostic
+                    // pipelines, not displayed to humans. For human-facing text,
+                    // use Environment.NewLine.
+                    sb.Append(text).Append('\n');
                 }
 
                 return sb.ToString();
