@@ -228,42 +228,42 @@ internal class TranscribeProcess
             if (proc.HasExited)
             {
                 LogRedirector.Info("PowerWordRelive.Transcribe",
-                    "Python FunASR server already exited before teardown",
+                    "Python transcription server already exited before teardown",
                     new { pid, exitCode = proc.ExitCode });
                 proc.Dispose();
                 return;
             }
 
             LogRedirector.Info("PowerWordRelive.Transcribe",
-                "Waiting for Python FunASR server to exit", new { pid });
+                "Waiting for Python transcription server to exit", new { pid });
 
             proc.WaitForExit(5000);
 
             if (proc.HasExited)
             {
                 LogRedirector.Info("PowerWordRelive.Transcribe",
-                    "Python FunASR server exited gracefully", new { pid });
+                    "Python transcription server exited gracefully", new { pid });
                 proc.Dispose();
                 return;
             }
 
             LogRedirector.Warn("PowerWordRelive.Transcribe",
-                "Python FunASR server did not exit, force killing", new { pid });
+                "Python transcription server did not exit, force killing", new { pid });
 
             proc.Kill(true);
             proc.WaitForExit(2000);
 
             if (proc.HasExited)
                 LogRedirector.Info("PowerWordRelive.Transcribe",
-                    "Python FunASR server killed", new { pid });
+                    "Python transcription server killed", new { pid });
             else
                 LogRedirector.Warn("PowerWordRelive.Transcribe",
-                    "Python FunASR server still alive after kill", new { pid });
+                    "Python transcription server still alive after kill", new { pid });
         }
         catch (Exception ex)
         {
             LogRedirector.Error("PowerWordRelive.Transcribe",
-                "Error tearing down Python FunASR server", new { pid, error = ex.Message });
+                "Error tearing down Python transcription server", new { pid, error = ex.Message });
         }
 
         proc.Dispose();

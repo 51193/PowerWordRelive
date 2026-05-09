@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""FunASR Paraformer 转录服务器 — 常驻进程，stdin/stdout JSON 行通信。"""
+"""转录服务端脚本 — 常驻进程，stdin/stdout JSON 行通信。接收音频路径，返回 SRT 格式转录结果。"""
 import json
 import logging
 import os
@@ -68,7 +68,7 @@ def split_sentences(text):
 
 
 def write_srt(segments, output_dir, stem, fallback_duration_ms):
-    """将 FunASR 返回的 segments 写入 SRT 文件。"""
+    """将转录模型返回的 segments 写入 SRT 文件。"""
     srt_path = os.path.join(output_dir, f"{stem}.srt")
 
     entries = []
@@ -122,7 +122,7 @@ def _ms_to_srt(ms):
 def run_server():
     import argparse
 
-    parser = argparse.ArgumentParser(description="FunASR Paraformer transcription server")
+    parser = argparse.ArgumentParser(description="Transcription server")
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--model", default="paraformer-zh")
     parser.add_argument("--device", default="cuda")
@@ -132,7 +132,7 @@ def run_server():
 
     from funasr import AutoModel
 
-    # FunASR 在初始化时会向 stdout 输出版本/下载信息，重定向到 /dev/null 避免污染 JSON 协议和日志。
+    # 模型在初始化时会向 stdout 输出版本/下载信息，重定向到 /dev/null 避免污染 JSON 协议和日志。
     devnull = open(os.devnull, "w")
     old_stdout = sys.stdout
     sys.stdout = devnull

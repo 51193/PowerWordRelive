@@ -11,16 +11,16 @@
         <ProjectReference Include="..\PowerWordRelive.Infrastructure\PowerWordRelive.Infrastructure.csproj"/>
     </ItemGroup>
 
-    <Target Name="CopyFunasrScript" AfterTargets="Build">
-        <Copy SourceFiles="$(RepoRoot)scripts\funasr_server.py" DestinationFolder="$(OutputPath)"/>
+    <Target Name="CopyTranscribeScript" AfterTargets="Build">
+        <Copy SourceFiles="$(RepoRoot)scripts\transcribe_server.py" DestinationFolder="$(OutputPath)"/>
     </Target>
 
-    <Target Name="CopyFunasrRequirements" AfterTargets="Build">
-        <Copy SourceFiles="$(RepoRoot)scripts\funasr_venv.requirements.txt" DestinationFolder="$(OutputPath)"/>
+    <Target Name="CopyTranscribeRequirements" AfterTargets="Build">
+        <Copy SourceFiles="$(RepoRoot)scripts\transcribe_venv.requirements.txt" DestinationFolder="$(OutputPath)"/>
     </Target>
 
-    <Target Name="CopyDownloadScript" AfterTargets="Build">
-        <Copy SourceFiles="$(RepoRoot)scripts\download_funasr_models.py" DestinationFolder="$(OutputPath)"/>
+    <Target Name="CopyTranscribeDownloadScript" AfterTargets="Build">
+        <Copy SourceFiles="$(RepoRoot)scripts\download_transcribe_models.py" DestinationFolder="$(OutputPath)"/>
     </Target>
 
 </Project>

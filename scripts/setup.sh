@@ -37,7 +37,7 @@ echo ""
 
 run_venv vad PowerWordRelive.AudioCapture
 run_venv speaker_split PowerWordRelive.SpeakerSplit
-run_venv funasr PowerWordRelive.Transcribe
+run_venv transcribe PowerWordRelive.Transcribe
 
 echo ""
 
@@ -76,17 +76,24 @@ run_download "Silero VAD" PowerWordRelive.AudioCapture vad download_vad_model.py
 
 mkdir -p "$CACHE_DIR/huggingface"
 HF_TOKEN=$(grep -s 'huggingface.token' "$SCRIPT_DIR/config" 2>/dev/null | cut -d' ' -f2- | xargs || echo "")
-if [ -n "$HF_TOKEN" ] && [ "$HF_TOKEN" != "hf_your_huggingface_token_here" ]; then
+if [ -z "$HF_TOKEN" ]; then
+    echo "[setup] 跳过 pyannote 模型下载: 未配置 huggingface.token"
+    echo ""
+elif [[ ! "$HF_TOKEN" =~ ^hf_ ]]; then
+    echo "[setup] 错误: huggingface.token 格式无效（应以 hf_ 开头）"
+    echo "[setup] 请在 config 文件中将 huggingface.token 替换为合法的 HuggingFace Token。"
+    echo "[setup] Token 获取方法请阅读 README: 'https://github.com/51193/PowerWordRelive#huggingface必填'"
+    echo "[setup]"
+    echo "[setup] 请放心：已完成的虚拟环境创建和 VAD 模型下载不会被清除，修正配置后重新运行 setup.sh 即可继续。"
+    exit 1
+else
     run_download "pyannote 说话人分离" PowerWordRelive.SpeakerSplit speaker_split download_speaker_model.py \
         --cache-dir "$CACHE_DIR/huggingface" \
         --hf-token "$HF_TOKEN"
-else
-    echo "[setup] 跳过 pyannote 模型下载: 未配置 huggingface.token"
-    echo ""
 fi
 
 mkdir -p "$CACHE_DIR/modelscope"
-run_download "FunASR Paraformer" PowerWordRelive.Transcribe funasr download_funasr_models.py \
+run_download "Paraformer 转录" PowerWordRelive.Transcribe transcribe download_transcribe_models.py \
     --cache-dir "$CACHE_DIR/modelscope"
 
 echo "============================================"

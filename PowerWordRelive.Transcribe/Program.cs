@@ -35,8 +35,8 @@ var cacheRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "c
 fs.CreateDirectory(inputDir);
 fs.CreateDirectory(outputDir);
 
-var pythonPath = Path.Combine(AppContext.BaseDirectory, "funasr_venv", "bin", "python3");
-var pythonScriptPath = Path.Combine(AppContext.BaseDirectory, "funasr_server.py");
+var pythonPath = Path.Combine(AppContext.BaseDirectory, "transcribe_venv", "bin", "python3");
+var pythonScriptPath = Path.Combine(AppContext.BaseDirectory, "transcribe_server.py");
 
 if (!fs.FileExists(pythonPath))
 {

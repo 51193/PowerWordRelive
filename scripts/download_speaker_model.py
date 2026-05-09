@@ -14,6 +14,20 @@ def main():
     parser.add_argument("--hf-token", required=True, help="HuggingFace 访问令牌")
     args = parser.parse_args()
 
+    try:
+        args.hf_token.encode("ascii")
+    except UnicodeEncodeError:
+        print("[SpeakerSplit] 错误: HuggingFace Token 包含非法字符（非 ASCII）。", file=sys.stderr)
+        print("[SpeakerSplit] 请在 config 文件中将 huggingface.token 替换为合法的 Token。", file=sys.stderr)
+        print("[SpeakerSplit] Token 获取方法: 'https://github.com/51193/PowerWordRelive#huggingface必填'", file=sys.stderr)
+        sys.exit(1)
+
+    if not args.hf_token.startswith("hf_"):
+        print("[SpeakerSplit] 错误: HuggingFace Token 格式无效（应以 hf_ 开头）。", file=sys.stderr)
+        print("[SpeakerSplit] 请在 config 文件中将 huggingface.token 替换为合法的 Token。", file=sys.stderr)
+        print("[SpeakerSplit] Token 获取方法: 'https://github.com/51193/PowerWordRelive#huggingface必填'", file=sys.stderr)
+        sys.exit(1)
+
     os.makedirs(args.cache_dir, exist_ok=True)
     os.environ["HF_HOME"] = args.cache_dir
 
