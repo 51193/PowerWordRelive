@@ -8,6 +8,11 @@
         <AppendRuntimeIdentifierToOutputPath Condition="!$(MSBuildProjectName.EndsWith('Tests'))">false</AppendRuntimeIdentifierToOutputPath>
     </PropertyGroup>
 
+    <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+        <DebugSymbols>false</DebugSymbols>
+        <DebugType>none</DebugType>
+    </PropertyGroup>
+
     <Target Name="CopyConfig" AfterTargets="Build" Condition="!$(MSBuildProjectName.EndsWith('Tests'))">
         <!-- Release: always use config.example to avoid leaking secrets -->
         <Copy SourceFiles="$(RepoRoot)config.example"
@@ -24,6 +29,10 @@
 
     <Target Name="CopySetupScript" AfterTargets="Build" Condition="!$(MSBuildProjectName.EndsWith('Tests'))">
         <Copy SourceFiles="$(RepoRoot)scripts/setup.sh" DestinationFolder="$(CommonOutputDir)"/>
+    </Target>
+
+    <Target Name="CopyGenerateKey" AfterTargets="Build" Condition="!$(MSBuildProjectName.EndsWith('Tests'))">
+        <Copy SourceFiles="$(RepoRoot)scripts/generate_key.sh" DestinationFolder="$(CommonOutputDir)"/>
     </Target>
 
     <Target Name="CopyPrompts" AfterTargets="Build" Condition="!$(MSBuildProjectName.EndsWith('Tests'))">

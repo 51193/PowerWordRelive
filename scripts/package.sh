@@ -11,8 +11,7 @@ tar -czf "$PKG_DIR/pwr-remote-${VERSION}-linux-x64.tar.gz" \
     --exclude='*_venv' \
     --exclude='cache' \
     -C "$ROOT/out" \
-    PowerWordRelive.RemoteBackend \
-    config
+    PowerWordRelive.RemoteBackend
 
 echo "=== Packaging Main System ($VERSION) ==="
 tar -czf "$PKG_DIR/pwr-main-${VERSION}-linux-x64.tar.gz" \
@@ -30,6 +29,7 @@ tar -czf "$PKG_DIR/pwr-main-${VERSION}-linux-x64.tar.gz" \
     PowerWordRelive.LocalBackend \
     text_data \
     setup.sh \
+    generate_key.sh \
     config
 
 echo ""

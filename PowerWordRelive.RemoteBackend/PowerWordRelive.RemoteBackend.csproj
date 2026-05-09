@@ -10,4 +10,23 @@
         <ProjectReference Include="..\PowerWordRelive.Infrastructure\PowerWordRelive.Infrastructure.csproj"/>
     </ItemGroup>
 
+    <Target Name="CopyWwwRoot" AfterTargets="Build">
+        <ItemGroup>
+            <WwwRootFiles Include="wwwroot\**\*"/>
+        </ItemGroup>
+        <Copy SourceFiles="@(WwwRootFiles)" DestinationFolder="$(OutputPath)wwwroot\%(RecursiveDir)"/>
+    </Target>
+
+    <Target Name="CopyRemoteConfig" AfterTargets="Build">
+        <Copy SourceFiles="$(RepoRoot)config.example"
+              DestinationFiles="$(OutputPath)config"
+              Condition="'$(Configuration)' == 'Release'"/>
+        <Copy SourceFiles="$(RepoRoot)config"
+              DestinationFolder="$(OutputPath)"
+              Condition="'$(Configuration)' != 'Release' And Exists('$(RepoRoot)config')"/>
+        <Copy SourceFiles="$(RepoRoot)config.example"
+              DestinationFiles="$(OutputPath)config"
+              Condition="'$(Configuration)' != 'Release' And !Exists('$(RepoRoot)config')"/>
+    </Target>
+
 </Project>

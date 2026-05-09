@@ -184,7 +184,7 @@ echo "刚才复制的密钥" > keys/local_backend.key
 
 ### 4. 配置并启动服务端
 
-编辑服务器上的 `config` 文件：
+在服务器上解压后的目录中，编辑 `PowerWordRelive.RemoteBackend/config` 文件：
 
 ```
 remote_backend.port: 9500
@@ -194,6 +194,7 @@ remote_backend.key_path: /etc/pwr/remote_backend.key
 启动：
 
 ```bash
+cd PowerWordRelive.RemoteBackend
 dotnet PowerWordRelive.RemoteBackend.dll
 ```
 
