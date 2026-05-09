@@ -10,43 +10,45 @@ using PowerWordRelive.LLMRequester.Parsing;
 
 namespace PowerWordRelive.LLMRequester.Requests;
 
-internal class StoryProgressRequest : IRequest
+internal class ConsistencyRequest : IRequest
 {
-    private const string SystemPromptFile = "prompts/story_progress/story_progress_system.md";
-    private const string UserPromptFile = "prompts/story_progress/story_progress_user.md";
-    private const string EmptyStateMarker = "__EMPTY__";
+    private const string SystemPromptFile = "prompts/consistency/consistency_system.md";
+    private const string UserPromptFile = "prompts/consistency/consistency_user.md";
 
 #if DEBUG
-    private static readonly object StoryProgressLogLock = new();
+    private static readonly object ConsistencyLogLock = new();
 #endif
 
     private readonly string _apiUrl;
     private readonly string _token;
     private readonly LLMDatabase _db;
-    private readonly StoryProgressContainer _container;
     private readonly RefinementContainer _refContainer;
+    private readonly StoryProgressContainer _spContainer;
+    private readonly TaskAccessor _taskAccessor;
     private readonly ConsistencyAccessor _consistencyAccessor;
     private readonly PromptAssembler _assembler;
-    private readonly StoryProgressConfig _config;
+    private readonly ConsistencyConfig _config;
     private readonly LlmApiClient _apiClient;
-    private readonly StoryProgressParser _parser = new();
+    private readonly ConsistencyParser _parser = new();
 
-    public StoryProgressRequest(
+    public ConsistencyRequest(
         string apiUrl,
         string token,
         LLMDatabase db,
-        StoryProgressContainer container,
         RefinementContainer refContainer,
+        StoryProgressContainer spContainer,
+        TaskAccessor taskAccessor,
         ConsistencyAccessor consistencyAccessor,
         PromptAssembler assembler,
-        StoryProgressConfig config,
+        ConsistencyConfig config,
         LlmApiClient apiClient)
     {
         _apiUrl = apiUrl;
         _token = token;
         _db = db;
-        _container = container;
         _refContainer = refContainer;
+        _spContainer = spContainer;
+        _taskAccessor = taskAccessor;
         _consistencyAccessor = consistencyAccessor;
         _assembler = assembler;
         _config = config;
@@ -55,19 +57,21 @@ internal class StoryProgressRequest : IRequest
 
     public async Task Request()
     {
-        if (!_db.TryEnsureStoryProgressTable())
+        if (!_db.TryEnsureConsistencyTable())
             return;
 
         var refinementText = BuildRefinementWindow(_config.RefinementWindow);
         var storyProgressText = BuildStoryProgressWindow(_config.StoryProgressWindow);
-        var consistencyText = _consistencyAccessor.BuildConsistencyTableText();
+        var activeTasksText = _taskAccessor.BuildActiveTasksText();
+        var consistencyTableText = _consistencyAccessor.BuildConsistencyTableText();
 
         var emptyVars = new Dictionary<string, string>();
         var userVars = new Dictionary<string, string>
         {
             ["refinement_window"] = refinementText,
             ["story_progress_window"] = storyProgressText,
-            ["consistency_table"] = consistencyText
+            ["active_tasks"] = activeTasksText,
+            ["consistency_table"] = consistencyTableText
         };
 
         string systemPrompt;
@@ -81,7 +85,7 @@ internal class StoryProgressRequest : IRequest
         catch (Exception ex)
         {
             LogRedirector.Error("PowerWordRelive.LLMRequester",
-                $"Story progress prompt assembly failed: {ex.Message}");
+                $"Consistency prompt assembly failed: {ex.Message}");
             return;
         }
 
@@ -94,7 +98,7 @@ internal class StoryProgressRequest : IRequest
         catch (Exception ex)
         {
             LogRedirector.Error("PowerWordRelive.LLMRequester",
-                $"Story progress API call failed: {ex.Message}");
+                $"Consistency API call failed: {ex.Message}");
             return;
         }
 
@@ -102,9 +106,9 @@ internal class StoryProgressRequest : IRequest
         if (string.IsNullOrEmpty(content) || content == "EMPTY")
         {
             LogRedirector.Info("PowerWordRelive.LLMRequester",
-                "Story progress returned EMPTY, no changes needed");
+                "Consistency returned EMPTY, no changes needed");
 #if DEBUG
-            AppendStoryProgressLog(DateTime.Now, content, new List<IncrementalOperation>());
+            AppendConsistencyLog(DateTime.Now, content, new List<ConsistencyOperation>());
 #endif
             return;
         }
@@ -113,15 +117,15 @@ internal class StoryProgressRequest : IRequest
         if (operations.Count == 0)
         {
             LogRedirector.Info("PowerWordRelive.LLMRequester",
-                "No valid story progress operations parsed");
+                "No valid consistency operations parsed");
             return;
         }
 
         LogRedirector.Info("PowerWordRelive.LLMRequester",
-            $"Applying {operations.Count} story progress operation(s)");
+            $"Applying {operations.Count} consistency operation(s)");
 
 #if DEBUG
-        AppendStoryProgressLog(DateTime.Now, content, operations);
+        AppendConsistencyLog(DateTime.Now, content, operations);
 #endif
 
         foreach (var op in operations)
@@ -132,30 +136,55 @@ internal class StoryProgressRequest : IRequest
             catch (Exception ex)
             {
                 LogRedirector.Error("PowerWordRelive.LLMRequester",
-                    $"Failed to apply story progress operation {op.Type}: {ex.Message}");
+                    $"Failed to apply consistency operation {op.Type}: {ex.Message}");
             }
     }
 
-    private void ApplyOperation(IncrementalOperation op)
+    private void ApplyOperation(ConsistencyOperation op)
     {
         switch (op.Type)
         {
-            case IncrementalOperation.OperationType.Append:
-                _container.Add(op.Content!);
-                break;
+            case ConsistencyOperation.OperationType.Append:
+            {
+                var existingId = _db.FindActiveConsistencyIdByName(op.Name!);
+                if (existingId != null)
+                {
+                    LogRedirector.Warn("PowerWordRelive.LLMRequester",
+                        $"Consistency append skipped: name '{op.Name}' already exists");
+                    return;
+                }
 
-            case IncrementalOperation.OperationType.Insert:
-                _container.Add(op.DisplayIndex!.Value, op.Content!);
+                _db.InsertConsistencyEntry(op.Name!, op.Detail!);
                 break;
+            }
 
-            case IncrementalOperation.OperationType.Edit:
-                _container.Edit(op.DisplayIndex!.Value, op.Content!);
+            case ConsistencyOperation.OperationType.Remove:
+            {
+                var id = ResolveActiveConsistencyId(op.Name!);
+                if (id == null)
+                    return;
+                _db.SoftDeleteConsistencyEntry(id.Value);
                 break;
+            }
 
-            case IncrementalOperation.OperationType.Remove:
-                _container.Remove(op.DisplayIndex!.Value);
+            case ConsistencyOperation.OperationType.Edit:
+            {
+                var id = ResolveActiveConsistencyId(op.Name!);
+                if (id == null)
+                    return;
+                _db.UpdateConsistencyEntry(id.Value, op.Name!, op.Detail!);
                 break;
+            }
         }
+    }
+
+    private int? ResolveActiveConsistencyId(string name)
+    {
+        var id = _db.FindActiveConsistencyIdByName(name);
+        if (id == null)
+            LogRedirector.Warn("PowerWordRelive.LLMRequester",
+                $"Consistency name '{name}' not found among active entries");
+        return id;
     }
 
     private string BuildRefinementWindow(int windowSize)
@@ -184,13 +213,13 @@ internal class StoryProgressRequest : IRequest
     {
         try
         {
-            var entries = _container.Get(windowSize);
+            var entries = _spContainer.Get(windowSize);
             if (entries.Count == 0)
-                return EmptyStateMarker;
+                return "(暂无故事进展)";
 
             var sb = new StringBuilder();
-            for (var i = 0; i < entries.Count; i++)
-                sb.AppendLine($"{i + 1}. {entries[i]}");
+            foreach (var entry in entries)
+                sb.AppendLine(entry);
 
             return sb.ToString().TrimEnd();
         }
@@ -198,30 +227,29 @@ internal class StoryProgressRequest : IRequest
         {
             LogRedirector.Info("PowerWordRelive.LLMRequester",
                 $"Story progress window query failed (DB not ready): {ex.Message}");
-            return EmptyStateMarker;
+            return "(暂无故事进展)";
         }
     }
 
 #if DEBUG
-    private static void AppendStoryProgressLog(DateTime localTime, string rawResponse,
-        IReadOnlyList<IncrementalOperation> operations)
+    private static void AppendConsistencyLog(DateTime localTime, string rawResponse,
+        IReadOnlyList<ConsistencyOperation> operations)
     {
-        var logPath = Path.Combine(AppContext.BaseDirectory, "story_progress.log");
+        var logPath = Path.Combine(AppContext.BaseDirectory, "consistency.log");
         var ts = localTime.ToString("yyyy-MM-dd HH:mm:ss");
 
         var opsLines = operations.Count == 0
             ? "  (EMPTY)"
             : string.Join('\n', operations.Select(o => o.Type switch
             {
-                IncrementalOperation.OperationType.Append => $"  append: {o.Content}",
-                IncrementalOperation.OperationType.Insert => $"  insert @{o.DisplayIndex}: {o.Content}",
-                IncrementalOperation.OperationType.Edit => $"  edit @{o.DisplayIndex}: {o.Content}",
-                IncrementalOperation.OperationType.Remove => $"  remove @{o.DisplayIndex}",
+                ConsistencyOperation.OperationType.Append => $"  append: {o.Name} | {o.Detail}",
+                ConsistencyOperation.OperationType.Remove => $"  remove: {o.Name}",
+                ConsistencyOperation.OperationType.Edit => $"  edit: {o.Name} | {o.Detail}",
                 _ => "  ?"
             }));
 
         var entry = $"""
-                     === StoryProgress Operations @ {ts} ({operations.Count} ops) ===
+                     === Consistency Operations @ {ts} ({operations.Count} ops) ===
                      --- LLM Raw Output ---
                      {rawResponse}
                      --- Parsed Operations ---
@@ -230,7 +258,7 @@ internal class StoryProgressRequest : IRequest
 
                      """;
 
-        lock (StoryProgressLogLock)
+        lock (ConsistencyLogLock)
         {
             File.AppendAllText(logPath, entry);
         }

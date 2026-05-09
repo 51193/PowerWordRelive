@@ -114,7 +114,20 @@ if (timerIntervals.Count == 0)
 using var db = new LLMDatabase(sqlitePath);
 var assembler = new PromptAssembler(fs, textDataBaseDir);
 
-var registry = RequestRegistry.Build(apiUrl, llmToken, db, assembler, requestConfigs);
+var activeTaskLimit = int.TryParse(
+    llmRequestConfig.GetValueOrDefault("window_limits.active_task", "30"), out var atl)
+    ? atl
+    : 30;
+var consistencyLimit = int.TryParse(
+    llmRequestConfig.GetValueOrDefault("window_limits.consistency", "50"), out var cl)
+    ? cl
+    : 50;
+
+var taskAccessor = new TaskAccessor(db, activeTaskLimit);
+var consistencyAccessor = new ConsistencyAccessor(db, consistencyLimit);
+
+var registry = RequestRegistry.Build(apiUrl, llmToken, db, assembler, requestConfigs,
+    taskAccessor, consistencyAccessor);
 var queue = new ConcurrentRequestQueue();
 
 LogRedirector.Info("PowerWordRelive.LLMRequester", "LLM Requester starting",

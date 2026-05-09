@@ -15,6 +15,11 @@ const taskPrev = document.getElementById('task-prev');
 const taskNext = document.getElementById('task-next');
 const taskPageInfo = document.getElementById('task-page-info');
 const taskPagination = document.getElementById('task-pagination');
+const conList = document.getElementById('con-list');
+const conPrev = document.getElementById('con-prev');
+const conNext = document.getElementById('con-next');
+const conPageInfo = document.getElementById('con-page-info');
+const conPagination = document.getElementById('con-pagination');
 
 let ws = null;
 let msgId = 0;
@@ -35,6 +40,8 @@ let currentPanelTab = 'story_progress';
 let taskStatus = 'in_progress';
 let taskOffset = 0;
 let taskTotal = 0;
+let conOffset = 0;
+let conTotal = 0;
 
 function connect() {
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -51,6 +58,7 @@ function connect() {
                 if (allMessages.length === 0 && !loading) startLoading();
                 if (spTotal === 0) loadStoryProgress(0);
                 if (taskTotal === 0) loadTasks('in_progress', 0);
+                if (conTotal === 0) loadConsistency(0);
             }
             return;
         }
@@ -290,17 +298,14 @@ function switchPanelTab(tab) {
     document.querySelectorAll('#panel-tabs .tab').forEach(t => {
         if (t.textContent.includes('故事进展') && tab === 'story_progress') t.classList.add('active');
         if (t.textContent.includes('任务') && tab === 'task') t.classList.add('active');
+        if (t.textContent.includes('一致性表格') && tab === 'consistency') t.classList.add('active');
     });
 
-    if (tab === 'story_progress') {
-        spList.style.display = '';
-        spPagination.style.display = spTotal > 0 ? 'flex' : 'none';
-        taskContainer.style.display = 'none';
-    } else {
-        spList.style.display = 'none';
-        spPagination.style.display = 'none';
-        taskContainer.style.display = '';
-    }
+    spList.style.display = tab === 'story_progress' ? '' : 'none';
+    spPagination.style.display = (tab === 'story_progress' && spTotal > 0) ? 'flex' : 'none';
+    taskContainer.style.display = tab === 'task' ? '' : 'none';
+    conList.style.display = tab === 'consistency' ? '' : 'none';
+    conPagination.style.display = (tab === 'consistency' && conTotal > 0) ? 'flex' : 'none';
 }
 
 function switchTaskTab(status) {
@@ -361,6 +366,55 @@ function changeTaskPage(direction) {
     const newOffset = taskOffset + direction * PAGE_SIZE;
     if (newOffset < 0 || newOffset >= taskTotal) return;
     loadTasks(taskStatus, newOffset);
+}
+
+async function loadConsistency(offset) {
+    const batch = await queryAsync('list_consistency', {limit: PAGE_SIZE, offset});
+    if (!batch || batch.type === 'error') {
+        conList.innerHTML = '<div class="chat-placeholder">加载失败</div>';
+        return;
+    }
+
+    conOffset = offset;
+    conTotal = batch.total || 0;
+    const items = batch.data || [];
+
+    conList.innerHTML = '';
+    if (items.length === 0) {
+        conList.innerHTML = '<div class="chat-placeholder">暂无条目</div>';
+        conPagination.style.display = 'none';
+        return;
+    }
+
+    for (const item of items) {
+        const entry = document.createElement('div');
+        entry.className = 'con-entry';
+
+        const name = document.createElement('div');
+        name.className = 'con-name';
+        name.textContent = item.name || '';
+
+        const detail = document.createElement('div');
+        detail.className = 'con-detail';
+        detail.textContent = item.detail || '';
+
+        entry.appendChild(name);
+        entry.appendChild(detail);
+        conList.appendChild(entry);
+    }
+
+    const totalPages = Math.ceil(conTotal / PAGE_SIZE) || 1;
+    const currentPage = Math.floor(conOffset / PAGE_SIZE) + 1;
+    conPageInfo.textContent = `第 ${currentPage}/${totalPages} 页`;
+    conPrev.disabled = conOffset <= 0;
+    conNext.disabled = conOffset + PAGE_SIZE >= conTotal;
+    conPagination.style.display = 'flex';
+}
+
+function changeConPage(direction) {
+    const newOffset = conOffset + direction * PAGE_SIZE;
+    if (newOffset < 0 || newOffset >= conTotal) return;
+    loadConsistency(newOffset);
 }
 
 connect();

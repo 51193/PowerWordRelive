@@ -129,6 +129,7 @@ public class RemoteConnectionService
             "list_story_progress" => await dbService.ListStoryProgressAsync(limit, offset),
             "list_tasks" => await dbService.ListTasksAsync(
                 dict.GetValueOrDefault("status", "in_progress"), limit, offset),
+            "list_consistency" => await dbService.ListConsistencyAsync(limit, offset),
             _ => throw new Exception($"Unknown query: {query}")
         };
     }

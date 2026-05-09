@@ -11,7 +11,9 @@ public static class RequestRegistry
         string llmToken,
         LLMDatabase db,
         PromptAssembler assembler,
-        Dictionary<string, LlmRequestConfig> requestConfigs)
+        Dictionary<string, LlmRequestConfig> requestConfigs,
+        TaskAccessor taskAccessor,
+        ConsistencyAccessor consistencyAccessor)
     {
         var apiClient = new LlmApiClient();
         var registry = new Dictionary<string, IRequest>();
@@ -24,13 +26,17 @@ public static class RequestRegistry
                     apiUrl, llmToken, db, assembler, (SpeakerIdentificationConfig)config, apiClient),
 
                 "refinement" => CreateRefinementRequest(
-                    apiUrl, llmToken, db, assembler, (RefinementConfig)config, apiClient),
+                    apiUrl, llmToken, db, assembler, (RefinementConfig)config, apiClient, consistencyAccessor),
 
                 "story_progress" => CreateStoryProgressRequest(
-                    apiUrl, llmToken, db, assembler, (StoryProgressConfig)config, apiClient),
+                    apiUrl, llmToken, db, assembler, (StoryProgressConfig)config, apiClient, consistencyAccessor),
 
                 "task" => CreateTaskRequest(
-                    apiUrl, llmToken, db, assembler, (TaskConfig)config, apiClient),
+                    apiUrl, llmToken, db, assembler, (TaskConfig)config, apiClient, taskAccessor, consistencyAccessor),
+
+                "consistency" => CreateConsistencyRequest(
+                    apiUrl, llmToken, db, assembler, (ConsistencyConfig)config, apiClient,
+                    taskAccessor, consistencyAccessor),
 
                 _ => throw new InvalidOperationException($"Unknown request key: {key}")
             };
@@ -47,10 +53,12 @@ public static class RequestRegistry
         LLMDatabase db,
         PromptAssembler assembler,
         RefinementConfig config,
-        LlmApiClient apiClient)
+        LlmApiClient apiClient,
+        ConsistencyAccessor consistencyAccessor)
     {
         var container = new RefinementContainer(db);
-        return new RefinementRequest(apiUrl, llmToken, db, container, assembler, config, apiClient);
+        return new RefinementRequest(apiUrl, llmToken, db, container, consistencyAccessor, assembler, config,
+            apiClient);
     }
 
     private static StoryProgressRequest CreateStoryProgressRequest(
@@ -59,11 +67,13 @@ public static class RequestRegistry
         LLMDatabase db,
         PromptAssembler assembler,
         StoryProgressConfig config,
-        LlmApiClient apiClient)
+        LlmApiClient apiClient,
+        ConsistencyAccessor consistencyAccessor)
     {
         var container = new StoryProgressContainer(db);
         var refContainer = new RefinementContainer(db);
-        return new StoryProgressRequest(apiUrl, llmToken, db, container, refContainer, assembler, config, apiClient);
+        return new StoryProgressRequest(apiUrl, llmToken, db, container, refContainer, consistencyAccessor,
+            assembler, config, apiClient);
     }
 
     private static TaskRequest CreateTaskRequest(
@@ -72,10 +82,29 @@ public static class RequestRegistry
         LLMDatabase db,
         PromptAssembler assembler,
         TaskConfig config,
-        LlmApiClient apiClient)
+        LlmApiClient apiClient,
+        TaskAccessor taskAccessor,
+        ConsistencyAccessor consistencyAccessor)
     {
         var refContainer = new RefinementContainer(db);
         var spContainer = new StoryProgressContainer(db);
-        return new TaskRequest(apiUrl, llmToken, db, refContainer, spContainer, assembler, config, apiClient);
+        return new TaskRequest(apiUrl, llmToken, db, refContainer, spContainer,
+            taskAccessor, consistencyAccessor, assembler, config, apiClient);
+    }
+
+    private static ConsistencyRequest CreateConsistencyRequest(
+        string apiUrl,
+        string llmToken,
+        LLMDatabase db,
+        PromptAssembler assembler,
+        ConsistencyConfig config,
+        LlmApiClient apiClient,
+        TaskAccessor taskAccessor,
+        ConsistencyAccessor consistencyAccessor)
+    {
+        var refContainer = new RefinementContainer(db);
+        var spContainer = new StoryProgressContainer(db);
+        return new ConsistencyRequest(apiUrl, llmToken, db, refContainer, spContainer,
+            taskAccessor, consistencyAccessor, assembler, config, apiClient);
     }
 }

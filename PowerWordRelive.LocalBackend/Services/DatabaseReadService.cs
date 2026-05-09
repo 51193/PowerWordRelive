@@ -159,6 +159,41 @@ public class DatabaseReadService
         return (items, total);
     }
 
+    public async Task<(List<object> items, int total)> ListConsistencyAsync(int limit, int offset)
+    {
+        if (!_fs.FileExists(_dbPath))
+            return (new List<object>(), 0);
+
+        await using var conn = CreateReadOnlyConnection();
+        await conn.OpenAsync();
+
+        if (!await TableExists(conn, "consistency_entries"))
+            return (new List<object>(), 0);
+
+        var items = new List<object>();
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+                              SELECT name, detail FROM consistency_entries
+                              WHERE deleted = 0
+                              ORDER BY id
+                              LIMIT @limit OFFSET @offset
+                          """;
+        cmd.Parameters.AddWithValue("@limit", limit);
+        cmd.Parameters.AddWithValue("@offset", offset);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+            items.Add(new { name = reader.GetString(0), detail = reader.GetString(1) });
+
+        var total = 0;
+        await using var countCmd = conn.CreateCommand();
+        countCmd.CommandText = "SELECT COUNT(*) FROM consistency_entries WHERE deleted = 0";
+        var countResult = await countCmd.ExecuteScalarAsync();
+        if (countResult != null)
+            total = Convert.ToInt32(countResult);
+
+        return (items, total);
+    }
+
     private SqliteConnection CreateReadOnlyConnection()
     {
         return new SqliteConnection($"Data Source={_dbPath};Mode=ReadOnly");

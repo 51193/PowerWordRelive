@@ -17,6 +17,7 @@ public static class LlmConfigParser
                 "refinement" => ParseRefinement(key, llmRequestConfig),
                 "story_progress" => ParseStoryProgress(key, llmRequestConfig),
                 "task" => ParseTask(key, llmRequestConfig),
+                "consistency" => ParseConsistency(key, llmRequestConfig),
                 _ => throw new InvalidOperationException($"Unknown request key: {key}")
             };
         return result;
@@ -98,10 +99,20 @@ public static class LlmConfigParser
         var reasoningEffort = ParseReasoningEffort(key, cfg);
         var refinementWindow = ParseIntConfig(key, "refinement_window", cfg, 15);
         var storyProgressWindow = ParseIntConfig(key, "story_progress_window", cfg, 10);
-        var activeTaskWindow = ParseIntConfig(key, "active_task_window", cfg, 30);
         var finishedTaskWindow = ParseIntConfig(key, "finished_task_window", cfg, 8);
         return new TaskConfig(model, thinkingEnabled, reasoningEffort,
-            refinementWindow, storyProgressWindow, activeTaskWindow, finishedTaskWindow);
+            refinementWindow, storyProgressWindow, finishedTaskWindow);
+    }
+
+    private static ConsistencyConfig ParseConsistency(string key, Dictionary<string, string> cfg)
+    {
+        var model = ParseModel(key, cfg);
+        var thinkingEnabled = ParseThinkingEnabled(key, cfg);
+        var reasoningEffort = ParseReasoningEffort(key, cfg);
+        var refinementWindow = ParseIntConfig(key, "refinement_window", cfg, 15);
+        var storyProgressWindow = ParseIntConfig(key, "story_progress_window", cfg, 10);
+        return new ConsistencyConfig(model, thinkingEnabled, reasoningEffort,
+            refinementWindow, storyProgressWindow);
     }
 
     private static int ParseContextWindow(string key, Dictionary<string, string> cfg)

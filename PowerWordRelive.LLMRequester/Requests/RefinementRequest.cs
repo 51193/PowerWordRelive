@@ -28,6 +28,7 @@ internal class RefinementRequest : IRequest
     private readonly string _token;
     private readonly LLMDatabase _db;
     private readonly RefinementContainer _container;
+    private readonly ConsistencyAccessor _consistencyAccessor;
     private readonly PromptAssembler _assembler;
     private readonly RefinementConfig _config;
     private readonly LlmApiClient _apiClient;
@@ -38,6 +39,7 @@ internal class RefinementRequest : IRequest
         string token,
         LLMDatabase db,
         RefinementContainer container,
+        ConsistencyAccessor consistencyAccessor,
         PromptAssembler assembler,
         RefinementConfig config,
         LlmApiClient apiClient)
@@ -46,6 +48,7 @@ internal class RefinementRequest : IRequest
         _token = token;
         _db = db;
         _container = container;
+        _consistencyAccessor = consistencyAccessor;
         _assembler = assembler;
         _config = config;
         _apiClient = apiClient;
@@ -58,12 +61,14 @@ internal class RefinementRequest : IRequest
 
         var dialogueText = BuildDialogueWindow(_config.DialogueWindow);
         var refinementText = BuildRefinementWindow(_config.RefinementWindow);
+        var consistencyText = _consistencyAccessor.BuildConsistencyTableText();
 
         var emptyVars = new Dictionary<string, string>();
         var userVars = new Dictionary<string, string>
         {
             ["dialogue_window"] = dialogueText,
-            ["refinement_window"] = refinementText
+            ["refinement_window"] = refinementText,
+            ["consistency_table"] = consistencyText
         };
 
         string systemPrompt;

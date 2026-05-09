@@ -469,6 +469,94 @@ public class LLMDatabase : IDisposable
         return result is DBNull or null ? null : Convert.ToInt32(result);
     }
 
+    public bool TryEnsureConsistencyTable()
+    {
+        try
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = """
+                                  CREATE TABLE IF NOT EXISTS consistency_entries (
+                                      id      INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                                      name    TEXT NOT NULL,
+                                      detail  TEXT NOT NULL,
+                                      deleted INTEGER NOT NULL DEFAULT 0
+                                  );
+                              """;
+            cmd.ExecuteNonQuery();
+            return true;
+        }
+        catch (SqliteException ex)
+        {
+            LogRedirector.Info("PowerWordRelive.LLMRequester",
+                $"Consistency table not ready: {ex.Message}");
+            return false;
+        }
+    }
+
+    public List<(int Id, string Name, string Detail)> GetActiveConsistencyEntries(int limit)
+    {
+        var list = new List<(int, string, string)>();
+
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = """
+                              SELECT id, name, detail FROM consistency_entries
+                              WHERE deleted = 0
+                              ORDER BY id
+                              LIMIT @limit
+                          """;
+        cmd.Parameters.AddWithValue("@limit", limit);
+
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+            list.Add((reader.GetInt32(0), reader.GetString(1), reader.GetString(2)));
+
+        return list;
+    }
+
+    public int CountActiveConsistencyEntries()
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*) FROM consistency_entries WHERE deleted = 0";
+        return Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
+    }
+
+    public void InsertConsistencyEntry(string name, string detail)
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = "INSERT INTO consistency_entries (name, detail) VALUES (@name, @detail)";
+        cmd.Parameters.AddWithValue("@name", name);
+        cmd.Parameters.AddWithValue("@detail", detail);
+        cmd.ExecuteNonQuery();
+    }
+
+    public void UpdateConsistencyEntry(int id, string name, string detail)
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = "UPDATE consistency_entries SET name = @name, detail = @detail WHERE id = @id";
+        cmd.Parameters.AddWithValue("@id", id);
+        cmd.Parameters.AddWithValue("@name", name);
+        cmd.Parameters.AddWithValue("@detail", detail);
+        cmd.ExecuteNonQuery();
+    }
+
+    public void SoftDeleteConsistencyEntry(int id)
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = "UPDATE consistency_entries SET deleted = 1 WHERE id = @id";
+        cmd.Parameters.AddWithValue("@id", id);
+        cmd.ExecuteNonQuery();
+    }
+
+    public int? FindActiveConsistencyIdByName(string name)
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = "SELECT id FROM consistency_entries WHERE name = @name AND deleted = 0 LIMIT 1";
+        cmd.Parameters.AddWithValue("@name", name);
+
+        var result = cmd.ExecuteScalar();
+        return result is DBNull or null ? null : Convert.ToInt32(result);
+    }
+
     public void Dispose()
     {
         _connection.Close();

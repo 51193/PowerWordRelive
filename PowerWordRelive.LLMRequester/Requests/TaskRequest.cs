@@ -5,6 +5,8 @@ using PowerWordRelive.Infrastructure.Prompt;
 using PowerWordRelive.LLMRequester.Core;
 using PowerWordRelive.LLMRequester.Database;
 using PowerWordRelive.LLMRequester.Parsing;
+#if DEBUG
+#endif
 
 namespace PowerWordRelive.LLMRequester.Requests;
 
@@ -12,15 +14,18 @@ internal class TaskRequest : IRequest
 {
     private const string SystemPromptFile = "prompts/task/task_system.md";
     private const string UserPromptFile = "prompts/task/task_user.md";
-    private const string EmptyStateMarker = "__EMPTY__";
 
-    private static readonly string[] ValidFinishStatuses = { "complete", "fail", "discard" };
+#if DEBUG
+    private static readonly object TaskLogLock = new();
+#endif
 
     private readonly string _apiUrl;
     private readonly string _token;
     private readonly LLMDatabase _db;
     private readonly RefinementContainer _refContainer;
     private readonly StoryProgressContainer _spContainer;
+    private readonly TaskAccessor _taskAccessor;
+    private readonly ConsistencyAccessor _consistencyAccessor;
     private readonly PromptAssembler _assembler;
     private readonly TaskConfig _config;
     private readonly LlmApiClient _apiClient;
@@ -32,6 +37,8 @@ internal class TaskRequest : IRequest
         LLMDatabase db,
         RefinementContainer refContainer,
         StoryProgressContainer spContainer,
+        TaskAccessor taskAccessor,
+        ConsistencyAccessor consistencyAccessor,
         PromptAssembler assembler,
         TaskConfig config,
         LlmApiClient apiClient)
@@ -41,6 +48,8 @@ internal class TaskRequest : IRequest
         _db = db;
         _refContainer = refContainer;
         _spContainer = spContainer;
+        _taskAccessor = taskAccessor;
+        _consistencyAccessor = consistencyAccessor;
         _assembler = assembler;
         _config = config;
         _apiClient = apiClient;
@@ -53,8 +62,9 @@ internal class TaskRequest : IRequest
 
         var refinementText = BuildRefinementWindow(_config.RefinementWindow);
         var storyProgressText = BuildStoryProgressWindow(_config.StoryProgressWindow);
-        var activeTasksText = BuildActiveTasksWindow(_config.ActiveTaskWindow);
-        var finishedTasksText = BuildFinishedTasksWindow(_config.FinishedTaskWindow);
+        var activeTasksText = _taskAccessor.BuildActiveTasksText();
+        var finishedTasksText = _taskAccessor.BuildFinishedTasksText(_config.FinishedTaskWindow);
+        var consistencyText = _consistencyAccessor.BuildConsistencyTableText();
 
         var emptyVars = new Dictionary<string, string>();
         var userVars = new Dictionary<string, string>
@@ -62,7 +72,8 @@ internal class TaskRequest : IRequest
             ["refinement_window"] = refinementText,
             ["story_progress_window"] = storyProgressText,
             ["active_tasks"] = activeTasksText,
-            ["finished_tasks"] = finishedTasksText
+            ["finished_tasks"] = finishedTasksText,
+            ["consistency_table"] = consistencyText
         };
 
         string systemPrompt;
@@ -98,6 +109,9 @@ internal class TaskRequest : IRequest
         {
             LogRedirector.Info("PowerWordRelive.LLMRequester",
                 "Task returned EMPTY, no changes needed");
+#if DEBUG
+            AppendTaskLog(DateTime.Now, content, new List<TaskOperation>());
+#endif
             return;
         }
 
@@ -111,6 +125,10 @@ internal class TaskRequest : IRequest
 
         LogRedirector.Info("PowerWordRelive.LLMRequester",
             $"Applying {operations.Count} task operation(s)");
+
+#if DEBUG
+        AppendTaskLog(DateTime.Now, content, operations);
+#endif
 
         foreach (var op in operations)
             try
@@ -245,62 +263,39 @@ internal class TaskRequest : IRequest
         }
     }
 
-    private string BuildActiveTasksWindow(int limit)
+#if DEBUG
+    private static void AppendTaskLog(DateTime localTime, string rawResponse,
+        IReadOnlyList<TaskOperation> operations)
     {
-        try
-        {
-            var totalCount = _db.CountActiveTasks();
-            if (totalCount == 0)
-                return EmptyStateMarker;
+        var logPath = Path.Combine(AppContext.BaseDirectory, "task.log");
+        var ts = localTime.ToString("yyyy-MM-dd HH:mm:ss");
 
-            if (totalCount > limit)
-                LogRedirector.Error("PowerWordRelive.LLMRequester",
-                    $"Active task count ({totalCount}) exceeds window limit ({limit}), only showing first {limit} tasks");
-
-            var entries = _db.GetActiveTasks(limit);
-
-            var sb = new StringBuilder();
-            foreach (var (_, summary, detail) in entries)
-                sb.AppendLine($"{summary}：{detail}");
-
-            return sb.ToString().TrimEnd();
-        }
-        catch (SqliteException ex)
-        {
-            LogRedirector.Info("PowerWordRelive.LLMRequester",
-                $"Active tasks query failed (DB not ready): {ex.Message}");
-            return EmptyStateMarker;
-        }
-    }
-
-    private string BuildFinishedTasksWindow(int limit)
-    {
-        try
-        {
-            var entries = _db.GetRecentFinishedTasks(limit);
-            if (entries.Count == 0)
-                return "(暂无已完成任务)";
-
-            var sb = new StringBuilder();
-            foreach (var (_, summary, detail, status) in entries)
+        var opsLines = operations.Count == 0
+            ? "  (EMPTY)"
+            : string.Join('\n', operations.Select(o => o.Type switch
             {
-                var statusLabel = status switch
-                {
-                    "complete" => "已完成",
-                    "fail" => "已失败",
-                    "discard" => "已放弃",
-                    _ => status
-                };
-                sb.AppendLine($"{summary} [{statusLabel}]：{detail}");
-            }
+                TaskOperation.OperationType.Append => $"  append: {o.Key} | {o.Value}",
+                TaskOperation.OperationType.Remove => $"  remove: {o.Key}",
+                TaskOperation.OperationType.Edit => $"  edit: {o.Key} | {o.Value}",
+                TaskOperation.OperationType.Replace => $"  replace: {o.Key} -> {o.NewKey} | {o.Value}",
+                TaskOperation.OperationType.Finish => $"  finish: {o.Key} | {o.Status}",
+                _ => "  ?"
+            }));
 
-            return sb.ToString().TrimEnd();
-        }
-        catch (SqliteException ex)
+        var entry = $"""
+                     === Task Operations @ {ts} ({operations.Count} ops) ===
+                     --- LLM Raw Output ---
+                     {rawResponse}
+                     --- Parsed Operations ---
+                     {opsLines}
+                     ================================
+
+                     """;
+
+        lock (TaskLogLock)
         {
-            LogRedirector.Info("PowerWordRelive.LLMRequester",
-                $"Finished tasks query failed (DB not ready): {ex.Message}");
-            return "(暂无已完成任务)";
+            File.AppendAllText(logPath, entry);
         }
     }
+#endif
 }

@@ -51,14 +51,16 @@ transcription_store.input_dir: ./transcriptions
 transcription_store.poll_interval_sec: 1
 
 # LLM API
-llm.token: sk-your_token_here
+llm.token: 在此填入你的LLM API Token
 llm.api_url: https://api.deepseek.com/v1/chat/completions
 
 # 定时器（格式：llm_request.timer.<秒数>: <逗号分隔的请求键列表>）
 llm_request.timer.45: speaker_identification, refinement
-llm_request.timer.90: story_progress
+llm_request.timer.90: story_progress, task, consistency
 
-# Speaker ID 推断请求参数
+# 窗口限制（兜底上限，独立于具体请求）
+llm_request.window_limits.active_task: 30
+llm_request.window_limits.consistency: 50
 llm_request.speaker_identification.model: deepseek-v4-pro
 llm_request.speaker_identification.thinking_enabled: true
 llm_request.speaker_identification.reasoning_effort: high
@@ -79,14 +81,19 @@ llm_request.story_progress.refinement_window: 20
 llm_request.story_progress.story_progress_window: 15
 
 # 任务系统请求参数
-llm_request.timer.120: task
 llm_request.task.model: deepseek-v4-flash
 llm_request.task.thinking_enabled: true
 llm_request.task.reasoning_effort: high
 llm_request.task.refinement_window: 15
 llm_request.task.story_progress_window: 10
-llm_request.task.active_task_window: 30
 llm_request.task.finished_task_window: 8
+
+# 一致性表格请求参数
+llm_request.consistency.model: deepseek-v4-flash
+llm_request.consistency.thinking_enabled: true
+llm_request.consistency.reasoning_effort: high
+llm_request.consistency.refinement_window: 15
+llm_request.consistency.story_progress_window: 10
 
 # 持久化存储（SQLite）
 storage.sqlite_path: ./data/pwr.db
@@ -106,4 +113,4 @@ remote_backend.port: 9500
 remote_backend.key_path: /etc/pwr/remote_backend.key
 
 # HuggingFace 令牌
-huggingface.token: hf_your_huggingface_token_here
+huggingface.token: 在此填入你的HuggingFace Token
