@@ -172,7 +172,7 @@ internal class TranscribeProcess
             LogRedirector.Error("PowerWordRelive.Transcribe",
                 "Failed to transcribe file", new { file = fileName, error = ex.Message });
 
-            _opt.Fs.TryReleaseProcessing(processingPath, wavPath);
+            _opt.Fs.TryCompleteProcessing(processingPath);
         }
     }
 

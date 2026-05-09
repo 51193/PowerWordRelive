@@ -64,10 +64,13 @@ def match_speaker(
     known: dict[str, list[np.ndarray]],
     next_id: int,
     threshold: float,
+    emb_dir: str,
 ) -> tuple[str, int]:
     emb_norm = float(np.linalg.norm(embedding))
     if emb_norm < 0.01 or np.isnan(emb_norm):
         new_id = f"speaker_{next_id}"
+        known[new_id] = [embedding]
+        persist_embedding(new_id, embedding, emb_dir)
         return new_id, next_id + 1
 
     best_speaker = None
@@ -94,9 +97,12 @@ def match_speaker(
         avg_ref_norm = sum(ref_norms) / len(ref_norms) if ref_norms else 0.0
         if emb_norm > avg_ref_norm * REF_NORM_RATIO:
             known[best_speaker] = [embedding]
+            persist_embedding(best_speaker, embedding, emb_dir)
             return best_speaker, next_id
 
     new_id = f"speaker_{next_id}"
+    known[new_id] = [embedding]
+    persist_embedding(new_id, embedding, emb_dir)
     return new_id, next_id + 1
 
 
@@ -155,6 +161,7 @@ def run_server():
     pipeline.embedding_batch_size = args.embedding_batch_size
 
     known, next_id = load_embeddings(args.embeddings_dir)
+    last_speaker: str | None = None
 
     for line in sys.stdin:
         line = line.strip()
@@ -171,7 +178,13 @@ def run_server():
         t_start = time.time()
 
         try:
-            output = pipeline(input_path)
+            known_count = len(known)
+            if known_count == 0 or known_count == 1:
+                min_spk, max_spk = 1, 2
+            else:
+                min_spk = known_count
+                max_spk = known_count + 2
+            output = pipeline(input_path, min_speakers=min_spk, max_speakers=max_spk)
         except Exception as e:
             resp = {"error": str(e)}
             print(json.dumps(resp, ensure_ascii=False), flush=True)
@@ -192,17 +205,21 @@ def run_server():
         for label in labels:
             emb = emb_map.get(label)
             if emb is not None:
-                speaker_id, next_id = match_speaker(
-                    np.array(emb), known, next_id, threshold)
-                if speaker_id not in known:
-                    known[speaker_id] = [np.array(emb)]
-                    persist_embedding(speaker_id, np.array(emb), args.embeddings_dir)
+                emb_arr = np.array(emb, dtype=np.float64)
+                norm = float(np.linalg.norm(emb_arr))
+                if norm < 0.05 or np.isnan(norm):
+                    speaker_id = last_speaker if last_speaker else f"speaker_{next_id}"
+                    if speaker_id not in known:
+                        known[speaker_id] = [emb_arr]
+                        persist_embedding(speaker_id, emb_arr, args.embeddings_dir)
+                        next_id += 1
                 else:
-                    avg_emb = np.mean(known[speaker_id], axis=0)
-                    persist_embedding(speaker_id, avg_emb, args.embeddings_dir)
+                    speaker_id, next_id = match_speaker(
+                        emb_arr, known, next_id, threshold, args.embeddings_dir)
             else:
-                speaker_id = f"speaker_{next_id}"
-                next_id += 1
+                speaker_id = last_speaker if last_speaker else f"speaker_{next_id}"
+                if speaker_id not in known:
+                    next_id += 1
             label_to_persistent[label] = speaker_id
 
         input_stem = Path(input_path).stem
@@ -210,8 +227,22 @@ def run_server():
             input_stem = input_stem[:-4]
         unique_speakers = set(label_to_persistent.values())
 
+        try:
+            with wave.open(input_path, "rb") as wf:
+                source_duration = wf.getnframes() / wf.getframerate()
+        except Exception:
+            source_duration = 0.0
+
         segments = []
         for segment, _, label in exclusive.itertracks(yield_label=True):
+            if segment.start >= segment.end or segment.start >= source_duration - 0.001:
+                print(
+                    f"WARN Skipping out-of-bounds diarization segment: "
+                    f"start={segment.start:.3f}s end={segment.end:.3f}s "
+                    f"(audio_duration={source_duration:.3f}s)",
+                    file=sys.stderr,
+                )
+                continue
             speaker_id = label_to_persistent[label]
             offset_ms = int(segment.start * 1000)
             output_filename = f"{input_stem}+{offset_ms:05d}+{speaker_id}.wav"
@@ -237,6 +268,9 @@ def run_server():
                 if os.path.exists(seg_path):
                     os.remove(seg_path)
             segments = [{"file": new_name, "speaker": speaker_id, "start": 0.0, "end": -1.0}]
+
+        if segments:
+            last_speaker = segments[-1]["speaker"]
 
         elapsed = time.time() - t_start
         with wave.open(input_path, "rb") as wf:

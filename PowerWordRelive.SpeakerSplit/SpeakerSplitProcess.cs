@@ -234,7 +234,7 @@ internal class SpeakerSplitProcess
             LogRedirector.Error("PowerWordRelive.SpeakerSplit",
                 "Failed to process file", new { file = fileName, error = ex.Message });
 
-            _opt.Fs.TryReleaseProcessing(processingPath, wavPath);
+            _opt.Fs.TryCompleteProcessing(processingPath);
         }
     }
 
