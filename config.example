@@ -78,6 +78,16 @@ llm_request.story_progress.reasoning_effort: high
 llm_request.story_progress.refinement_window: 20
 llm_request.story_progress.story_progress_window: 15
 
+# 任务系统请求参数
+llm_request.timer.120: task
+llm_request.task.model: deepseek-v4-flash
+llm_request.task.thinking_enabled: true
+llm_request.task.reasoning_effort: high
+llm_request.task.refinement_window: 15
+llm_request.task.story_progress_window: 10
+llm_request.task.active_task_window: 30
+llm_request.task.finished_task_window: 8
+
 # 持久化存储（SQLite）
 storage.sqlite_path: ./data/pwr.db
 

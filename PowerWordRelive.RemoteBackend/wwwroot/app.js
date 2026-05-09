@@ -9,6 +9,12 @@ const spPrev = document.getElementById('sp-prev');
 const spNext = document.getElementById('sp-next');
 const spPageInfo = document.getElementById('sp-page-info');
 const spPagination = document.getElementById('sp-pagination');
+const taskContainer = document.getElementById('task-container');
+const taskList = document.getElementById('task-list');
+const taskPrev = document.getElementById('task-prev');
+const taskNext = document.getElementById('task-next');
+const taskPageInfo = document.getElementById('task-page-info');
+const taskPagination = document.getElementById('task-pagination');
 
 let ws = null;
 let msgId = 0;
@@ -25,6 +31,11 @@ let spOffset = 0;
 let spTotal = 0;
 const PAGE_SIZE = 20;
 
+let currentPanelTab = 'story_progress';
+let taskStatus = 'in_progress';
+let taskOffset = 0;
+let taskTotal = 0;
+
 function connect() {
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     ws = new WebSocket(`${protocol}//${location.host}/ws/frontend`);
@@ -39,6 +50,7 @@ function connect() {
             if (msg.backend_connected) {
                 if (allMessages.length === 0 && !loading) startLoading();
                 if (spTotal === 0) loadStoryProgress(0);
+                if (taskTotal === 0) loadTasks('in_progress', 0);
             }
             return;
         }
@@ -272,11 +284,83 @@ function changeSpPage(direction) {
     loadStoryProgress(newOffset);
 }
 
-function switchDataTab(tab) {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab').forEach(t => {
-        if (t.textContent.includes('故事进展')) t.classList.add('active');
+function switchPanelTab(tab) {
+    currentPanelTab = tab;
+    document.querySelectorAll('#panel-tabs .tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('#panel-tabs .tab').forEach(t => {
+        if (t.textContent.includes('故事进展') && tab === 'story_progress') t.classList.add('active');
+        if (t.textContent.includes('任务') && tab === 'task') t.classList.add('active');
     });
+
+    if (tab === 'story_progress') {
+        spList.style.display = '';
+        spPagination.style.display = spTotal > 0 ? 'flex' : 'none';
+        taskContainer.style.display = 'none';
+    } else {
+        spList.style.display = 'none';
+        spPagination.style.display = 'none';
+        taskContainer.style.display = '';
+    }
+}
+
+function switchTaskTab(status) {
+    taskStatus = status;
+    document.querySelectorAll('#task-sub-tabs .sub-tab').forEach(t => t.classList.remove('active'));
+    const labels = {in_progress: '进行中', complete: '已完成', fail: '已失败', discard: '已放弃'};
+    document.querySelectorAll('#task-sub-tabs .sub-tab').forEach(t => {
+        if (t.textContent === labels[status]) t.classList.add('active');
+    });
+    loadTasks(status, 0);
+}
+
+async function loadTasks(status, offset) {
+    const batch = await queryAsync('list_tasks', {status, limit: PAGE_SIZE, offset});
+    if (!batch || batch.type === 'error') {
+        taskList.innerHTML = '<div class="chat-placeholder">加载失败</div>';
+        return;
+    }
+
+    taskStatus = status;
+    taskOffset = offset;
+    taskTotal = batch.total || 0;
+    const items = batch.data || [];
+
+    taskList.innerHTML = '';
+    if (items.length === 0) {
+        taskList.innerHTML = '<div class="chat-placeholder">暂无任务</div>';
+        taskPagination.style.display = 'none';
+        return;
+    }
+
+    for (const item of items) {
+        const entry = document.createElement('div');
+        entry.className = 'task-entry';
+
+        const summary = document.createElement('div');
+        summary.className = 'task-summary';
+        summary.textContent = item.summary || '';
+
+        const detail = document.createElement('div');
+        detail.className = 'task-detail';
+        detail.textContent = item.detail || '';
+
+        entry.appendChild(summary);
+        entry.appendChild(detail);
+        taskList.appendChild(entry);
+    }
+
+    const totalPages = Math.ceil(taskTotal / PAGE_SIZE) || 1;
+    const currentPage = Math.floor(taskOffset / PAGE_SIZE) + 1;
+    taskPageInfo.textContent = `第 ${currentPage}/${totalPages} 页`;
+    taskPrev.disabled = taskOffset <= 0;
+    taskNext.disabled = taskOffset + PAGE_SIZE >= taskTotal;
+    taskPagination.style.display = 'flex';
+}
+
+function changeTaskPage(direction) {
+    const newOffset = taskOffset + direction * PAGE_SIZE;
+    if (newOffset < 0 || newOffset >= taskTotal) return;
+    loadTasks(taskStatus, newOffset);
 }
 
 connect();

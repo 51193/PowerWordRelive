@@ -31,11 +31,28 @@
         </aside>
 
         <section class="data-panel">
-            <div class="tabs">
-                <button class="tab active" onclick="switchDataTab('story_progress')">故事进展</button>
+            <div class="tabs" id="panel-tabs">
+                <button class="tab active" onclick="switchPanelTab('story_progress')">故事进展</button>
+                <button class="tab" onclick="switchPanelTab('task')">任务</button>
             </div>
             <div class="sp-list" id="sp-list">
                 <div class="chat-placeholder">连接后端以加载内容</div>
+            </div>
+            <div class="task-container" id="task-container" style="display:none">
+                <div class="sub-tabs" id="task-sub-tabs">
+                    <button class="sub-tab active" onclick="switchTaskTab('in_progress')">进行中</button>
+                    <button class="sub-tab" onclick="switchTaskTab('complete')">已完成</button>
+                    <button class="sub-tab" onclick="switchTaskTab('fail')">已失败</button>
+                    <button class="sub-tab" onclick="switchTaskTab('discard')">已放弃</button>
+                </div>
+                <div class="task-list" id="task-list">
+                    <div class="chat-placeholder">连接后端以加载内容</div>
+                </div>
+                <div class="pagination" id="task-pagination" style="display:none">
+                    <button disabled id="task-prev" onclick="changeTaskPage(-1)">上一页</button>
+                    <span id="task-page-info"></span>
+                    <button disabled id="task-next" onclick="changeTaskPage(1)">下一页</button>
+                </div>
             </div>
             <div class="pagination" id="sp-pagination" style="display:none">
                 <button disabled id="sp-prev" onclick="changeSpPage(-1)">上一页</button>

@@ -149,8 +149,8 @@ internal class StoryProgressRequest : IRequest
                 return "(暂无精炼结果)";
 
             var sb = new StringBuilder();
-            for (var i = 0; i < entries.Count; i++)
-                sb.AppendLine($"{i + 1}. {entries[i]}");
+            foreach (var entry in entries)
+                sb.AppendLine(entry);
 
             return sb.ToString().TrimEnd();
         }

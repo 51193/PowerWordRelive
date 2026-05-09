@@ -109,20 +109,26 @@ public class RemoteConnectionService
     private static async Task<(object data, int total)> ExecuteQuery(
         DatabaseReadService dbService, string query, JsonElement? rawParams)
     {
-        var dict = new Dictionary<string, int>();
+        var dict = new Dictionary<string, string>();
         if (rawParams != null)
             foreach (var prop in rawParams.Value.EnumerateObject())
+            {
                 if (prop.Value.ValueKind == JsonValueKind.Number && prop.Value.TryGetInt32(out var v))
-                    dict[prop.Name] = v;
+                    dict[prop.Name] = v.ToString();
+                else if (prop.Value.ValueKind == JsonValueKind.String)
+                    dict[prop.Name] = prop.Value.GetString() ?? "";
+            }
 
-        var limit = dict.GetValueOrDefault("limit", 50);
-        var offset = dict.GetValueOrDefault("offset", 0);
+        var limit = int.TryParse(dict.GetValueOrDefault("limit", "50"), out var l) ? l : 50;
+        var offset = int.TryParse(dict.GetValueOrDefault("offset", "0"), out var o) ? o : 0;
 
         return query switch
         {
             "list_refinements" => await dbService.ListRefinementsAsync(limit, offset),
             "list_transcriptions" => await dbService.ListTranscriptionsAsync(limit, offset),
             "list_story_progress" => await dbService.ListStoryProgressAsync(limit, offset),
+            "list_tasks" => await dbService.ListTasksAsync(
+                dict.GetValueOrDefault("status", "in_progress"), limit, offset),
             _ => throw new Exception($"Unknown query: {query}")
         };
     }

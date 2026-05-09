@@ -307,6 +307,168 @@ public class LLMDatabase : IDisposable
         return list;
     }
 
+    public bool TryEnsureTaskTable()
+    {
+        try
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = """
+                                  CREATE TABLE IF NOT EXISTS task_entries (
+                                      id       INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                                      summary  TEXT NOT NULL,
+                                      detail   TEXT NOT NULL,
+                                      status   TEXT NOT NULL DEFAULT 'in_progress'
+                                  );
+                              """;
+            cmd.ExecuteNonQuery();
+            return true;
+        }
+        catch (SqliteException ex)
+        {
+            LogRedirector.Info("PowerWordRelive.LLMRequester",
+                $"Task table not ready: {ex.Message}");
+            return false;
+        }
+    }
+
+    public bool TryEnsureTaskFinishLogTable()
+    {
+        try
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = """
+                                  CREATE TABLE IF NOT EXISTS task_finish_log (
+                                      id       INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                                      task_id  INTEGER NOT NULL
+                                  );
+                              """;
+            cmd.ExecuteNonQuery();
+            return true;
+        }
+        catch (SqliteException ex)
+        {
+            LogRedirector.Info("PowerWordRelive.LLMRequester",
+                $"Task finish log table not ready: {ex.Message}");
+            return false;
+        }
+    }
+
+    public List<(int Id, string Summary, string Detail)> GetActiveTasks(int limit)
+    {
+        var list = new List<(int, string, string)>();
+
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = """
+                              SELECT id, summary, detail FROM task_entries
+                              WHERE status = 'in_progress'
+                              ORDER BY id
+                              LIMIT @limit
+                          """;
+        cmd.Parameters.AddWithValue("@limit", limit);
+
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+            list.Add((reader.GetInt32(0), reader.GetString(1), reader.GetString(2)));
+
+        return list;
+    }
+
+    public int CountActiveTasks()
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*) FROM task_entries WHERE status = 'in_progress'";
+        return Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
+    }
+
+    public List<(int Id, string Summary, string Detail, string Status)> GetRecentFinishedTasks(int limit)
+    {
+        var list = new List<(int, string, string, string)>();
+
+        if (limit <= 0)
+            return list;
+
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = """
+                              SELECT te.id, te.summary, te.detail, te.status
+                              FROM task_entries te
+                              INNER JOIN task_finish_log tfl ON te.id = tfl.task_id
+                              ORDER BY tfl.id DESC
+                              LIMIT @limit
+                          """;
+        cmd.Parameters.AddWithValue("@limit", limit);
+
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+            list.Add((reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetString(3)));
+
+        return list;
+    }
+
+    public void InsertTask(string summary, string detail)
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText =
+            "INSERT INTO task_entries (summary, detail, status) VALUES (@summary, @detail, 'in_progress')";
+        cmd.Parameters.AddWithValue("@summary", summary);
+        cmd.Parameters.AddWithValue("@detail", detail);
+        cmd.ExecuteNonQuery();
+    }
+
+    public void UpdateTaskDetail(int id, string summary, string detail)
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = "UPDATE task_entries SET summary = @summary, detail = @detail WHERE id = @id";
+        cmd.Parameters.AddWithValue("@id", id);
+        cmd.Parameters.AddWithValue("@summary", summary);
+        cmd.Parameters.AddWithValue("@detail", detail);
+        cmd.ExecuteNonQuery();
+    }
+
+    public void DeleteTask(int id)
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = "DELETE FROM task_entries WHERE id = @id";
+        cmd.Parameters.AddWithValue("@id", id);
+        cmd.ExecuteNonQuery();
+    }
+
+    public void SetTaskStatus(int id, string status)
+    {
+        using var txn = _connection.BeginTransaction();
+        try
+        {
+            using var updateCmd = _connection.CreateCommand();
+            updateCmd.Transaction = txn;
+            updateCmd.CommandText = "UPDATE task_entries SET status = @status WHERE id = @id";
+            updateCmd.Parameters.AddWithValue("@status", status);
+            updateCmd.Parameters.AddWithValue("@id", id);
+            updateCmd.ExecuteNonQuery();
+
+            using var logCmd = _connection.CreateCommand();
+            logCmd.Transaction = txn;
+            logCmd.CommandText = "INSERT INTO task_finish_log (task_id) VALUES (@task_id)";
+            logCmd.Parameters.AddWithValue("@task_id", id);
+            logCmd.ExecuteNonQuery();
+
+            txn.Commit();
+        }
+        catch
+        {
+            txn.Rollback();
+            throw;
+        }
+    }
+
+    public int? FindActiveTaskIdByKey(string summary)
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = "SELECT id FROM task_entries WHERE summary = @summary AND status = 'in_progress' LIMIT 1";
+        cmd.Parameters.AddWithValue("@summary", summary);
+
+        var result = cmd.ExecuteScalar();
+        return result is DBNull or null ? null : Convert.ToInt32(result);
+    }
+
     public void Dispose()
     {
         _connection.Close();
