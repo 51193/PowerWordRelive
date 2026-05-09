@@ -11,5 +11,6 @@ internal record TranscribeOptions(
     string Model,
     string Device,
     int PollIntervalSec,
-    IFileSystem Fs
+    IFileSystem Fs,
+    string? ModelscopeToken = null
 );

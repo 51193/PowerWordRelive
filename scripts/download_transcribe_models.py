@@ -8,10 +8,13 @@ import argparse
 def main():
     parser = argparse.ArgumentParser(description="预下载转录模型")
     parser.add_argument("--cache-dir", required=True, help="模型缓存目录（对应 MODELSCOPE_CACHE）")
+    parser.add_argument("--ms-token", default="", help="ModelScope 访问令牌（可选，不提供则下载限速 ~200 KB/s）")
     args = parser.parse_args()
 
     os.makedirs(args.cache_dir, exist_ok=True)
     os.environ["MODELSCOPE_CACHE"] = args.cache_dir
+    if args.ms_token:
+        os.environ["MODELSCOPE_API_TOKEN"] = args.ms_token
 
     print("[Transcribe] 开始加载模型（首次运行将下载模型，约 1GB，请耐心等待）...")
 

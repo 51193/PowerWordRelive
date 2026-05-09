@@ -12,7 +12,7 @@ processes.local_backend: PowerWordRelive.LocalBackend
 # 传递给各进程的配置域
 process_config.audio_capture.domains: audio_capture,general
 process_config.speaker_split.domains: speaker_split,general,huggingface
-process_config.transcribe.domains: transcribe,general
+process_config.transcribe.domains: transcribe,general,modelscope
 process_config.transcription_store.domains: transcription_store,storage,general
 process_config.llm_requester.domains: llm_request,llm,general,storage,text_data
 process_config.local_backend.domains: local_backend,storage,general
@@ -119,3 +119,8 @@ remote_backend.key_path: /etc/pwr/remote_backend.key
 
 # HuggingFace 令牌
 huggingface.token: 在此填入你的HuggingFace Token
+
+# ModelScope 令牌（可选，但强烈推荐）
+# 不配置会导致 FunASR 模型下载极慢（约 200 KB/s），配置后不限速
+# 获取方法: https://modelscope.cn/my/overview → 个人中心 → 访问控制，创建后填入下方
+modelscope.token: （可选）在此填入你的ModelScope访问令牌

@@ -74,6 +74,8 @@ internal class TranscribeProcess
                         $"--output-dir \"{_opt.OutputDir}\" " +
                         $"--model \"{_opt.Model}\" " +
                         $"--device \"{_opt.Device}\"";
+        if (!string.IsNullOrEmpty(_opt.ModelscopeToken))
+            arguments += $" --ms-token \"{_opt.ModelscopeToken}\"";
 
         var psi = new ProcessStartInfo
         {
@@ -89,6 +91,8 @@ internal class TranscribeProcess
         psi.Environment["TORCH_HOME"] = torchHome;
         psi.Environment["HF_HOME"] = hfHome;
         psi.Environment["MODELSCOPE_CACHE"] = modelscopeHome;
+        if (!string.IsNullOrEmpty(_opt.ModelscopeToken))
+            psi.Environment["MODELSCOPE_API_TOKEN"] = _opt.ModelscopeToken;
 
         return Process.Start(psi)!;
     }

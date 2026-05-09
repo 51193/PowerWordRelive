@@ -25,9 +25,10 @@
 | ffmpeg | `apt install ffmpeg` | [ffmpeg.org](https://ffmpeg.org/download.html) 下载并加入 PATH | 是 |
 | DeepSeek API Token | 去 [platform.deepseek.com](https://platform.deepseek.com) 注册充值 | 同左 | 是 |
 | HuggingFace Token | 去 [huggingface.co](https://huggingface.co/settings/tokens) 注册（免费）**+ 接受模型使用协议** | 同左 | 是 |
-| VB-Cable 虚拟声卡 | 不需要（PulseAudio 原生支持环路） | [vb-audio.com/Cable/](https://vb-audio.com/Cable/) 下载安装（免费） | Windows 必须 |
+| ModelScope Token | 去 [modelscope.cn](https://modelscope.cn/my/overview) 注册（免费） | 同左 | 否（但强烈推荐，否则模型下载限速 ~200 KB/s） |
+| 音频环回设备 | 不需要（PulseAudio 原生支持） | 任意环回设备均可（如 Stereo Mix、VoiceMeeter），搞不清楚则推荐安装 VB-Cable | 需要 |
 
-> **Windows 用户注意**：Windows 没有内建的系统音频环回设备，需要通过 VB-Cable 虚拟声卡将系统声音路由到 ffmpeg。安装后无需额外配置，系统会自动识别。
+> **Windows 用户注意**：Windows 没有内建系统音频环回设备，需要手动指定一个环回设备。默认值使用 VB-Cable 的虚拟声卡名（`VB-Audio Virtual Cable`），如果你知道自己的系统输出设备名称（如 Stereo Mix、VoiceMeeter 等），直接填入 `windows_audio_device` 配置项即可，不需要安装 VB-Cable。
 
 ### 第一步：下载
 
@@ -77,6 +78,10 @@ llm.token: sk-xxxxxxxxxxxxxxxx
 
 # HuggingFace Token：去 huggingface.co/settings/tokens 创建（免费的）
 huggingface.token: hf_xxxxxxxxxxxxxxxx
+
+# ModelScope Token（可选但推荐）：去 modelscope.cn/my/overview 创建（免费的）
+# 不填会导致 ASR 模型下载极慢（约 200 KB/s），详见下方"配置参考→ModelScope"一节
+modelscope.token: ms_xxxxxxxxxxxxxxxx
 ```
 
 > **关于 HuggingFace Token**：光注册 HuggingFace 账号还不够。这个项目使用的说话人分离模型（pyannote/speaker-diarization-3.1）是一个受限模型，需要在网页上接受使用协议才能下载。完整步骤如下：
@@ -154,7 +159,9 @@ audio_capture.silence_timeout_ms: 800
 # 最长一段录音秒数，超过会被强制切开
 audio_capture.max_segment_sec: 120
 # Windows：音频环回设备名（Linux 下自动使用 PulseAudio，忽略此项）
-# 如果你知道自己系统输出设备的名称，直接填进去；搞不清楚就安装 VB-Cable（免费），默认值即可
+# 默认使用 VB-Cable 的虚拟声卡名，安装后无需修改
+# 如果你知道系统输出设备的名称（如 Stereo Mix、VoiceMeeter 等），直接填进去即可，不需要 VB-Cable
+# 可用 ffmpeg -list_devices true -f dshow -i dummy 查看设备列表
 audio_capture.windows_audio_device: VB-Audio Virtual Cable
 ```
 
@@ -173,6 +180,22 @@ huggingface.token: 在此填入你的HuggingFace Token
 4. 把 Token 填到 `huggingface.token`
 
 没有 Token 或没有接受协议，说话人分离流水线会无法启动。
+
+### ModelScope（可选，但强烈推荐）
+
+```
+# ModelScope 访问令牌（可选，但强烈推荐）
+modelscope.token: （可选）在此填入你的ModelScope访问令牌
+```
+
+语音转录（ASR）使用的 FunASR 模型默认从 ModelScope 下载。不配置 Token 会被限速到约 200 KB/s，1GB 模型可能耗时数十分钟。配置后不限速。
+
+**获取方法：**
+
+1. 打开 https://modelscope.cn/my/overview → 登录（可用阿里云 / GitHub / 手机号注册）
+2. 点击左侧"访问令牌" → "创建访问令牌"
+3. 随便填个名称 → 确认创建
+4. 复制生成的 Token，填入上面 `modelscope.token` 一行
 
 ## 服务器部署
 
@@ -282,16 +305,16 @@ A:
 ### Q: Windows 上录音无声音/找不到设备？
 A: Windows 没有内建系统音频环回。两种方式解决：
 
-**方式一（推荐）：安装 VB-Cable**
-1. 从 [vb-audio.com/Cable/](https://vb-audio.com/Cable/) 下载安装（免费）
-2. 安装后保持 `config` 中 `audio_capture.windows_audio_device` 为默认值 `VB-Audio Virtual Cable` 即可，无需额外配置
-
-**方式二：使用已有的环回设备**
-如果系统有声卡自带的 Stereo Mix 或其他虚拟声卡（如 VoiceMeeter），先用以下命令查看设备列表：
+**方式一：使用已有的环回设备**
+先用以下命令查看设备列表：
 ```
 ffmpeg -list_devices true -f dshow -i dummy
 ```
 将列出的设备名填入 `config` 的 `audio_capture.windows_audio_device` 配置项。
+
+**方式二：安装 VB-Cable**
+1. 从 [vb-audio.com/Cable/](https://vb-audio.com/Cable/) 下载安装（免费）
+2. 安装后保持 `config` 中 `audio_capture.windows_audio_device` 为默认值 `VB-Audio Virtual Cable` 即可
 
 ### Q: 数据库里看不到数据？
 A: 先确认录音正常（看 `segments/` 目录下有没有 wav 文件）。如果有 wav 但没有文字，可能是 ASR 模型没下载好：重新运行初始化脚本（Linux：`bash setup.sh`，Windows：`.\setup.ps1`）。

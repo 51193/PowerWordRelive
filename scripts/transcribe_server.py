@@ -126,9 +126,13 @@ def run_server():
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--model", default="paraformer-zh")
     parser.add_argument("--device", default="cuda")
+    parser.add_argument("--ms-token", default="", help="ModelScope 访问令牌（可选）")
     args = parser.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
+
+    if args.ms_token:
+        os.environ["MODELSCOPE_API_TOKEN"] = args.ms_token
 
     from funasr import AutoModel
 

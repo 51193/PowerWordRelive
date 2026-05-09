@@ -10,6 +10,7 @@ var fs = new LocalFileSystem();
 var config = ChildConfigReader.ReadConfig();
 var trConfig = config.GetValueOrDefault("transcribe", new Dictionary<string, string>());
 var generalConfig = config.GetValueOrDefault("general", new Dictionary<string, string>());
+var msConfig = config.GetValueOrDefault("modelscope", new Dictionary<string, string>());
 
 var workRoot = generalConfig.GetValueOrDefault("work_root", "");
 var inputDir = trConfig.GetValueOrDefault("input_dir", "./speaker_segments");
@@ -17,6 +18,7 @@ var outputDir = trConfig.GetValueOrDefault("output_dir", "./transcriptions");
 var model = trConfig.GetValueOrDefault("model", "paraformer-zh");
 var device = trConfig.GetValueOrDefault("device", "cuda");
 int.TryParse(trConfig.GetValueOrDefault("poll_interval_sec", "1"), out var pollIntervalSec);
+var msToken = msConfig.GetValueOrDefault("token", "");
 
 if (!string.IsNullOrEmpty(workRoot) && Path.IsPathRooted(workRoot))
 {
@@ -58,7 +60,7 @@ LogRedirector.Info("PowerWordRelive.Transcribe", "Transcribe starting",
 
 var process = new TranscribeProcess(new TranscribeOptions(
     inputDir, outputDir, pythonScriptPath, pythonPath, cacheRoot,
-    model, device, pollIntervalSec, fs));
+    model, device, pollIntervalSec, fs, msToken));
 
 using var cts = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) =>
