@@ -1,9 +1,10 @@
-using System.Runtime.InteropServices;
 using PowerWordRelive.Infrastructure.Configuration;
 using PowerWordRelive.Infrastructure.Logging;
+using PowerWordRelive.Infrastructure.Platform;
 using PowerWordRelive.Infrastructure.Storage;
 using PowerWordRelive.TranscriptionStore;
 
+var platform = PlatformServicesFactory.Create();
 var fs = new LocalFileSystem();
 
 var config = ChildConfigReader.ReadConfig();
@@ -56,7 +57,7 @@ Console.CancelKeyPress += (_, e) =>
     cts.Cancel();
 };
 
-PosixSignalRegistration.Create(PosixSignal.SIGTERM, _ =>
+platform.RegisterShutdownSignal(() =>
 {
     LogRedirector.Info("PowerWordRelive.TranscriptionStore", "Shutting down...");
     cts.Cancel();

@@ -21,7 +21,8 @@ import signal
 import argparse
 from datetime import datetime, timezone
 
-signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+if hasattr(signal, 'SIGPIPE'):
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
 try:
     import torch

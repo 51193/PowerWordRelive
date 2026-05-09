@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+RID="${1:-linux-x64}"
+
 # 从 CI tag 读取版本号（如 v1.0.0 → 1.0.0），本地构建用 Directory.Build.props 中的默认值
 BUILD_ARGS="-c Release"
 if [ -n "$GITHUB_REF" ] && [[ "$GITHUB_REF" == refs/tags/v* ]]; then
@@ -9,7 +11,7 @@ if [ -n "$GITHUB_REF" ] && [[ "$GITHUB_REF" == refs/tags/v* ]]; then
     echo "=== Building version $TAG_VERSION from tag ==="
 fi
 
-echo "=== CI: Build ==="
+echo "=== CI ($RID): Build ==="
 dotnet build $BUILD_ARGS
 
 echo ""
@@ -17,5 +19,5 @@ echo "=== CI: Test ==="
 dotnet test
 
 echo ""
-echo "=== CI: Package ==="
-bash "$(dirname "$0")/package.sh"
+echo "=== CI ($RID): Package ==="
+bash "$(dirname "$0")/package.sh" "$RID"

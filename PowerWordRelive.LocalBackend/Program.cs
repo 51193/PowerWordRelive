@@ -1,11 +1,13 @@
-using System.Runtime.InteropServices;
 using PowerWordRelive.Infrastructure.Configuration;
 using PowerWordRelive.Infrastructure.Logging;
+using PowerWordRelive.Infrastructure.Platform;
 using PowerWordRelive.Infrastructure.Storage;
 using PowerWordRelive.LocalBackend.Models;
 using PowerWordRelive.LocalBackend.Services;
 
 var fs = new LocalFileSystem();
+
+var platform = PlatformServicesFactory.Create();
 
 var config = ChildConfigReader.ReadConfig();
 var options = LocalBackendOptions.FromConfig(config, fs);
@@ -14,9 +16,9 @@ LogRedirector.Info("LocalBackend", $"Starting, remote={options.RemoteHost}:{opti
 
 var dbService = new DatabaseReadService(options.SqlitePath, fs);
 
-PosixSignalRegistration.Create(PosixSignal.SIGTERM, _ =>
+platform.RegisterShutdownSignal(() =>
 {
-    LogRedirector.Info("LocalBackend", "Received SIGTERM, exiting");
+    LogRedirector.Info("LocalBackend", "Received shutdown signal, exiting");
     Environment.Exit(0);
 });
 

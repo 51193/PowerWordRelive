@@ -12,7 +12,8 @@ internal class RecordingProcess
     {
         _opt = options;
         _ffmpeg = new FfmpegWrapper(
-            _opt.PythonPath, _opt.CacheRoot, _opt.Fs);
+            _opt.PythonPath, _opt.CacheRoot, _opt.Fs,
+            _opt.Device, _opt.WindowsAudioDevice);
     }
 
     public async Task RunAsync(CancellationToken ct)
@@ -44,9 +45,8 @@ internal class RecordingProcess
                     var tempFile = line["SEGMENT_COMPLETE ".Length..];
                     if (_opt.Fs.FileExists(tempFile))
                     {
-                        var info = new FileInfo(tempFile);
                         LogRedirector.Info("PowerWordRelive.AudioCapture", "Segment completed",
-                            new { file = tempFile, sizeBytes = info.Length });
+                            new { file = tempFile, sizeBytes = _opt.Fs.GetFileSize(tempFile) });
                         await _opt.SegmentHandler.HandleSegmentAsync(tempFile, DateTime.UtcNow, ct);
                     }
                 }
@@ -91,14 +91,7 @@ internal class RecordingProcess
             LogRedirector.Info("PowerWordRelive.AudioCapture",
                 "Sending SIGINT to ffmpeg", new { pid });
 
-            using var sigint = Process.Start(new ProcessStartInfo
-            {
-                FileName = "kill",
-                Arguments = $"-INT {pid}",
-                UseShellExecute = false,
-                CreateNoWindow = true
-            });
-            sigint?.WaitForExit(500);
+            _opt.Platform.SendInterruptSignal(process);
 
             if (process.HasExited)
             {

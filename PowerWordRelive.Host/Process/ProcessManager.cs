@@ -1,6 +1,6 @@
-using System.Diagnostics;
 using PowerWordRelive.Host.Models;
 using PowerWordRelive.Infrastructure.Logging;
+using PowerWordRelive.Infrastructure.Platform;
 using PowerWordRelive.Infrastructure.Storage;
 
 namespace PowerWordRelive.Host.Process;
@@ -9,12 +9,15 @@ internal class ProcessManager
 {
     private readonly Dictionary<string, Dictionary<string, string>> _config;
     private readonly IFileSystem _fs;
+    private readonly IPlatformServices _platform;
     private readonly List<ProcessSpawner.SpawnedProcess> _spawned = new();
 
-    public ProcessManager(Dictionary<string, Dictionary<string, string>> config, IFileSystem fs)
+    public ProcessManager(Dictionary<string, Dictionary<string, string>> config, IFileSystem fs,
+        IPlatformServices platform)
     {
         _config = config;
         _fs = fs;
+        _platform = platform;
     }
 
     public async Task LaunchAllAsync()
@@ -104,7 +107,7 @@ internal class ProcessManager
                 LogRedirector.Info("PowerWordRelive.Host", "Sending SIGTERM to child process",
                     new { process = name, pid });
 
-                SendSigterm(pid);
+                _platform.SendTermSignal(spawned.SystemProcess);
                 spawned.SystemProcess.WaitForExit(5000);
 
                 if (spawned.SystemProcess.HasExited)
@@ -132,24 +135,6 @@ internal class ProcessManager
                 LogRedirector.Error("PowerWordRelive.Host", "Error terminating child process",
                     new { process = name, pid, error = ex.Message });
             }
-        }
-    }
-
-    private static void SendSigterm(int pid)
-    {
-        try
-        {
-            using var sigterm = System.Diagnostics.Process.Start(new ProcessStartInfo
-            {
-                FileName = "kill",
-                Arguments = $"-TERM {pid}",
-                UseShellExecute = false,
-                CreateNoWindow = true
-            });
-            sigterm?.WaitForExit(1000);
-        }
-        catch
-        {
         }
     }
 

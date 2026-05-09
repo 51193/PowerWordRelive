@@ -12,15 +12,15 @@
     </ItemGroup>
 
     <Target Name="CopyTranscribeScript" AfterTargets="Build">
-        <Copy SourceFiles="$(RepoRoot)scripts\transcribe_server.py" DestinationFolder="$(OutputPath)"/>
+        <Copy SourceFiles="$(RepoRoot)scripts/transcribe_server.py" DestinationFolder="$(OutputPath)"/>
     </Target>
 
     <Target Name="CopyTranscribeRequirements" AfterTargets="Build">
-        <Copy SourceFiles="$(RepoRoot)scripts\transcribe_venv.requirements.txt" DestinationFolder="$(OutputPath)"/>
+        <Copy SourceFiles="$(RepoRoot)scripts/transcribe_venv.requirements.txt" DestinationFolder="$(OutputPath)"/>
     </Target>
 
     <Target Name="CopyTranscribeDownloadScript" AfterTargets="Build">
-        <Copy SourceFiles="$(RepoRoot)scripts\download_transcribe_models.py" DestinationFolder="$(OutputPath)"/>
+        <Copy SourceFiles="$(RepoRoot)scripts/download_transcribe_models.py" DestinationFolder="$(OutputPath)"/>
     </Target>
 
 </Project>

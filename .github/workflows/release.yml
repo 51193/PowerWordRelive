@@ -6,10 +6,16 @@ on:
       - 'v*'
 
 jobs:
-  release:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+          - os: windows-latest
+            rid: win-x64
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -18,12 +24,33 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Build, Test & Package
-        run: bash scripts/ci.sh
+        shell: bash
+        run: bash scripts/ci.sh ${{ matrix.rid }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pwr-${{ matrix.rid }}
+          path: out/pkg/*.tar.gz
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: pkg
+
+      - name: Flatten artifact structure
+        run: |
+          find pkg -name '*.tar.gz' -exec mv {} . \;
+          ls -lh *.tar.gz
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            out/pkg/pwr-remote-*.tar.gz
-            out/pkg/pwr-main-*.tar.gz
+            *.tar.gz
           generate_release_notes: true

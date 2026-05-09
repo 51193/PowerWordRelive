@@ -1,9 +1,11 @@
-using System.Runtime.InteropServices;
 using PowerWordRelive.AudioCapture;
 using PowerWordRelive.Infrastructure.Configuration;
 using PowerWordRelive.Infrastructure.Logging;
+using PowerWordRelive.Infrastructure.Platform;
 using PowerWordRelive.Infrastructure.Storage;
 
+var platform = PlatformServicesFactory.Create();
+var device = AudioCaptureDeviceFactory.Create();
 var fs = new LocalFileSystem();
 
 var config = ChildConfigReader.ReadConfig();
@@ -17,6 +19,7 @@ int.TryParse(audioConfig.GetValueOrDefault("silence_timeout_ms", "300"), out var
 int.TryParse(audioConfig.GetValueOrDefault("max_segment_sec", "120"), out var maxSec);
 int.TryParse(audioConfig.GetValueOrDefault("no_speech_timeout_sec", "30"), out var noSpeechTimeoutSec);
 int.TryParse(audioConfig.GetValueOrDefault("min_speech_ms", "500"), out var minSpeechMs);
+audioConfig.TryGetValue("windows_audio_device", out var windowsAudioDevice);
 
 if (!string.IsNullOrEmpty(workRoot) && Path.IsPathRooted(workRoot))
     outputDir = Path.GetFullPath(Path.Combine(workRoot, outputDir));
@@ -27,7 +30,7 @@ fs.CreateDirectory(outputDir);
 
 var cacheRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "cache"));
 
-var pythonPath = Path.Combine(AppContext.BaseDirectory, "vad_venv", "bin", "python3");
+var pythonPath = platform.GetPythonVenvExecutable(Path.Combine(AppContext.BaseDirectory, "vad_venv"));
 var pythonScriptPath = Path.Combine(AppContext.BaseDirectory, "vad_segmenter.py");
 
 if (!fs.FileExists(pythonPath))
@@ -47,6 +50,7 @@ if (!fs.FileExists(pythonScriptPath))
 var handler = new LocalFileSegmentHandler(fs);
 var options = new RecordingOptions(
     outputDir, pythonScriptPath, pythonPath, cacheRoot, fs, handler,
+    platform, device, windowsAudioDevice,
     silenceMs, maxSec, noSpeechTimeoutSec, minSpeechMs);
 var process = new RecordingProcess(options);
 
@@ -58,7 +62,7 @@ Console.CancelKeyPress += (_, e) =>
     cts.Cancel();
 };
 
-PosixSignalRegistration.Create(PosixSignal.SIGTERM, _ =>
+platform.RegisterShutdownSignal(() =>
 {
     LogRedirector.Info("PowerWordRelive.AudioCapture", "Shutting down...");
     cts.Cancel();

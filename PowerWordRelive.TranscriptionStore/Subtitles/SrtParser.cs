@@ -37,7 +37,7 @@ internal static class SrtParser
             if (textLines.Count == 0)
                 throw new FormatException($"Subtitle block has no text (line {i})");
 
-            blocks.Add(new SubtitleBlock(startMs, endMs, string.Join("\n", textLines)));
+            blocks.Add(new SubtitleBlock(startMs, endMs, string.Join(Environment.NewLine, textLines)));
         }
 
         return blocks;

@@ -49,6 +49,11 @@ public sealed class InMemoryFileSystem : IFileSystem
         return _files.TryGetValue(path, out var content) ? content : "";
     }
 
+    public long GetFileSize(string path)
+    {
+        return _files.TryGetValue(path, out var content) ? content.Length : 0;
+    }
+
     public bool TryAcquireForProcessing(string filePath, out string processingPath)
     {
         processingPath = string.Empty;

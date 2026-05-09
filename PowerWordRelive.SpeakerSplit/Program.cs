@@ -1,9 +1,10 @@
-using System.Runtime.InteropServices;
 using PowerWordRelive.Infrastructure.Configuration;
 using PowerWordRelive.Infrastructure.Logging;
+using PowerWordRelive.Infrastructure.Platform;
 using PowerWordRelive.Infrastructure.Storage;
 using PowerWordRelive.SpeakerSplit;
 
+var platform = PlatformServicesFactory.Create();
 var fs = new LocalFileSystem();
 
 var config = ChildConfigReader.ReadConfig();
@@ -45,7 +46,7 @@ fs.CreateDirectory(inputDir);
 fs.CreateDirectory(outputDir);
 fs.CreateDirectory(embeddingsDir);
 
-var pythonPath = Path.Combine(AppContext.BaseDirectory, "speaker_split_venv", "bin", "python3");
+var pythonPath = platform.GetPythonVenvExecutable(Path.Combine(AppContext.BaseDirectory, "speaker_split_venv"));
 var pythonScriptPath = Path.Combine(AppContext.BaseDirectory, "speaker_diarize_server.py");
 
 if (!fs.FileExists(pythonPath))
@@ -79,7 +80,7 @@ Console.CancelKeyPress += (_, e) =>
     cts.Cancel();
 };
 
-PosixSignalRegistration.Create(PosixSignal.SIGTERM, _ =>
+platform.RegisterShutdownSignal(() =>
 {
     LogRedirector.Info("PowerWordRelive.SpeakerSplit", "Shutting down...");
     cts.Cancel();

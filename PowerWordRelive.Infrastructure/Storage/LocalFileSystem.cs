@@ -44,6 +44,11 @@ public class LocalFileSystem : IFileSystem
         return File.ReadAllText(path);
     }
 
+    public long GetFileSize(string path)
+    {
+        return new FileInfo(path).Length;
+    }
+
     public bool TryAcquireForProcessing(string filePath, out string processingPath)
     {
         processingPath = filePath + ProcessingExtension;

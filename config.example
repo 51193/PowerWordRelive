@@ -27,6 +27,11 @@ audio_capture.silence_timeout_ms: 800
 audio_capture.max_segment_sec: 120
 audio_capture.no_speech_timeout_sec: 30
 audio_capture.min_speech_ms: 500
+# Windows: DirectShow 音频设备名（Linux 下忽略，自动使用 PulseAudio）
+# 默认使用 VB-Cable 虚拟声卡 (https://vb-audio.com/Cable/)，安装后无需修改
+# 若使用其他环回设备，改为对应名称即可
+# 可用 ffmpeg -list_devices true -f dshow -i dummy 查看设备列表
+audio_capture.windows_audio_device: VB-Audio Virtual Cable
 
 # 说话人分离
 speaker_split.input_dir: ./segments

@@ -1,6 +1,6 @@
-using System.Runtime.InteropServices;
 using PowerWordRelive.Infrastructure.Configuration;
 using PowerWordRelive.Infrastructure.Logging;
+using PowerWordRelive.Infrastructure.Platform;
 using PowerWordRelive.Infrastructure.Prompt;
 using PowerWordRelive.Infrastructure.Storage;
 using PowerWordRelive.LLMRequester.Core;
@@ -8,6 +8,8 @@ using PowerWordRelive.LLMRequester.Database;
 using PowerWordRelive.LLMRequester.Requests;
 
 var fs = new LocalFileSystem();
+
+var platform = PlatformServicesFactory.Create();
 
 var config = ChildConfigReader.ReadConfig();
 var llmConfig = config.GetValueOrDefault("llm", new Dictionary<string, string>());
@@ -139,7 +141,7 @@ Console.CancelKeyPress += (_, e) =>
     cts.Cancel();
 };
 
-PosixSignalRegistration.Create(PosixSignal.SIGTERM, _ =>
+platform.RegisterShutdownSignal(() =>
 {
     LogRedirector.Info("PowerWordRelive.LLMRequester", "Shutting down...");
     cts.Cancel();

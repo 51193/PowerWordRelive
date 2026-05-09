@@ -1,9 +1,10 @@
-using System.Runtime.InteropServices;
 using PowerWordRelive.Infrastructure.Configuration;
 using PowerWordRelive.Infrastructure.Logging;
+using PowerWordRelive.Infrastructure.Platform;
 using PowerWordRelive.Infrastructure.Storage;
 using PowerWordRelive.Transcribe;
 
+var platform = PlatformServicesFactory.Create();
 var fs = new LocalFileSystem();
 
 var config = ChildConfigReader.ReadConfig();
@@ -35,7 +36,7 @@ var cacheRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "c
 fs.CreateDirectory(inputDir);
 fs.CreateDirectory(outputDir);
 
-var pythonPath = Path.Combine(AppContext.BaseDirectory, "transcribe_venv", "bin", "python3");
+var pythonPath = platform.GetPythonVenvExecutable(Path.Combine(AppContext.BaseDirectory, "transcribe_venv"));
 var pythonScriptPath = Path.Combine(AppContext.BaseDirectory, "transcribe_server.py");
 
 if (!fs.FileExists(pythonPath))
@@ -67,7 +68,7 @@ Console.CancelKeyPress += (_, e) =>
     cts.Cancel();
 };
 
-PosixSignalRegistration.Create(PosixSignal.SIGTERM, _ =>
+platform.RegisterShutdownSignal(() =>
 {
     LogRedirector.Info("PowerWordRelive.Transcribe", "Shutting down...");
     cts.Cancel();

@@ -5,15 +5,18 @@ namespace PowerWordRelive.AudioCapture;
 
 internal class FfmpegWrapper
 {
+    private readonly IAudioCaptureDevice _device;
     private readonly IFileSystem _fs;
     private readonly string _pythonPath;
     private readonly int _sampleRate;
     private readonly string _torchHome;
 
-    public FfmpegWrapper(string pythonPath, string cacheRoot, IFileSystem fs, int sampleRate = 16000)
+    public FfmpegWrapper(string pythonPath, string cacheRoot, IFileSystem fs,
+        IAudioCaptureDevice device, string? windowsAudioDevice = null, int sampleRate = 16000)
     {
         _pythonPath = pythonPath;
-        Monitor = DetectMonitor();
+        _device = device;
+        Monitor = device.BuildFfmpegInputArgs(windowsAudioDevice);
         _sampleRate = sampleRate;
         _torchHome = Path.Combine(cacheRoot, "torch");
         _fs = fs;
@@ -26,7 +29,7 @@ internal class FfmpegWrapper
         int silenceTimeoutMs, int maxSegmentSec, int noSpeechTimeoutSec, int minSpeechMs)
     {
         var ffmpegArgs = $"-hide_banner -nostats -loglevel error " +
-                         $"-f pulse -i {Monitor} -ac 1 -ar {_sampleRate} " +
+                         $"{Monitor} -ac 1 -ar {_sampleRate} " +
                          $"-f s16le pipe:1";
 
         var ffmpegPsi = new ProcessStartInfo
@@ -73,7 +76,6 @@ internal class FfmpegWrapper
             }
             catch
             {
-                // ffmpeg 被杀时管道断开，预期行为
             }
             finally
             {
@@ -82,24 +84,5 @@ internal class FfmpegWrapper
         });
 
         return (ffmpegProcess, pythonProcess);
-    }
-
-    private static string DetectMonitor()
-    {
-        var psi = new ProcessStartInfo
-        {
-            FileName = "pactl",
-            Arguments = "get-default-sink",
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-        using var process = Process.Start(psi)!;
-        var sink = process.StandardOutput.ReadToEnd().Trim();
-        if (!string.IsNullOrEmpty(sink))
-            return $"{sink}.monitor";
-
-        return "default";
     }
 }

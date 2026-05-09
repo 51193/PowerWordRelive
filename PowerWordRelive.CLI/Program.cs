@@ -1,10 +1,11 @@
 ﻿using System.Diagnostics;
-using System.Runtime.InteropServices;
 using System.Text.Json;
 using PowerWordRelive.Infrastructure.Models;
+using PowerWordRelive.Infrastructure.Platform;
 using PowerWordRelive.Infrastructure.Storage;
 
 var fs = new LocalFileSystem();
+var platform = PlatformServicesFactory.Create();
 
 var baseDir = AppContext.BaseDirectory;
 var hostDir = Path.GetFullPath(Path.Combine(baseDir, "..", "PowerWordRelive.Host"));
@@ -34,27 +35,14 @@ Console.CancelKeyPress += (_, e) =>
     ShutdownHost(process);
 };
 
-PosixSignalRegistration.Create(PosixSignal.SIGTERM, _ => { ShutdownHost(process); });
+platform.RegisterShutdownSignal(() => ShutdownHost(process));
 
-static void ShutdownHost(Process hostProcess)
+void ShutdownHost(Process hostProcess)
 {
     if (hostProcess.HasExited)
         return;
 
-    try
-    {
-        using var sigterm = Process.Start(new ProcessStartInfo
-        {
-            FileName = "kill",
-            Arguments = $"-TERM {hostProcess.Id}",
-            UseShellExecute = false,
-            CreateNoWindow = true
-        });
-        sigterm?.WaitForExit(1000);
-    }
-    catch
-    {
-    }
+    platform.SendTermSignal(hostProcess);
 
     try
     {
