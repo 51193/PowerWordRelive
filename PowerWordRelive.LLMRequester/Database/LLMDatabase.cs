@@ -485,6 +485,7 @@ public class LLMDatabase : IDisposable
                                       id      INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
                                       name    TEXT NOT NULL,
                                       detail  TEXT NOT NULL,
+                                      tag     TEXT NOT NULL DEFAULT 'null',
                                       deleted INTEGER NOT NULL DEFAULT 0
                                   );
                               """;
@@ -499,13 +500,13 @@ public class LLMDatabase : IDisposable
         }
     }
 
-    public List<(int Id, string Name, string Detail)> GetActiveConsistencyEntries(int limit)
+    public List<(int Id, string Name, string Detail, string Tag)> GetActiveConsistencyEntries(int limit)
     {
-        var list = new List<(int, string, string)>();
+        var list = new List<(int, string, string, string)>();
 
         using var cmd = _connection.CreateCommand();
         cmd.CommandText = """
-                              SELECT id, name, detail FROM consistency_entries
+                              SELECT id, name, detail, tag FROM consistency_entries
                               WHERE deleted = 0
                               ORDER BY id
                               LIMIT @limit
@@ -514,7 +515,7 @@ public class LLMDatabase : IDisposable
 
         using var reader = cmd.ExecuteReader();
         while (reader.Read())
-            list.Add((reader.GetInt32(0), reader.GetString(1), reader.GetString(2)));
+            list.Add((reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetString(3)));
 
         return list;
     }
@@ -526,22 +527,33 @@ public class LLMDatabase : IDisposable
         return Convert.ToInt32(cmd.ExecuteScalar() ?? 0);
     }
 
-    public void InsertConsistencyEntry(string name, string detail)
+    public void InsertConsistencyEntry(string name, string detail, string tag)
     {
         using var cmd = _connection.CreateCommand();
-        cmd.CommandText = "INSERT INTO consistency_entries (name, detail) VALUES (@name, @detail)";
+        cmd.CommandText = "INSERT INTO consistency_entries (name, detail, tag) VALUES (@name, @detail, @tag)";
         cmd.Parameters.AddWithValue("@name", name);
         cmd.Parameters.AddWithValue("@detail", detail);
+        cmd.Parameters.AddWithValue("@tag", tag);
         cmd.ExecuteNonQuery();
     }
 
-    public void UpdateConsistencyEntry(int id, string name, string detail)
+    public void UpdateConsistencyEntry(int id, string name, string detail, string tag)
     {
         using var cmd = _connection.CreateCommand();
-        cmd.CommandText = "UPDATE consistency_entries SET name = @name, detail = @detail WHERE id = @id";
+        cmd.CommandText = "UPDATE consistency_entries SET name = @name, detail = @detail, tag = @tag WHERE id = @id";
         cmd.Parameters.AddWithValue("@id", id);
         cmd.Parameters.AddWithValue("@name", name);
         cmd.Parameters.AddWithValue("@detail", detail);
+        cmd.Parameters.AddWithValue("@tag", tag);
+        cmd.ExecuteNonQuery();
+    }
+
+    public void UpdateConsistencyEntryTag(int id, string tag)
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = "UPDATE consistency_entries SET tag = @tag WHERE id = @id";
+        cmd.Parameters.AddWithValue("@id", id);
+        cmd.Parameters.AddWithValue("@tag", tag);
         cmd.ExecuteNonQuery();
     }
 

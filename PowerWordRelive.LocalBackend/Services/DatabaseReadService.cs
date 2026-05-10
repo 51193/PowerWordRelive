@@ -159,7 +159,7 @@ public class DatabaseReadService
         return (items, total);
     }
 
-    public async Task<(List<object> items, int total)> ListConsistencyAsync(int limit, int offset)
+    public async Task<(List<object> items, int total)> ListConsistencyAsync(int limit, int offset, string? tag = null)
     {
         if (!_fs.FileExists(_dbPath))
             return (new List<object>(), 0);
@@ -172,21 +172,44 @@ public class DatabaseReadService
 
         var items = new List<object>();
         await using var cmd = conn.CreateCommand();
-        cmd.CommandText = """
-                              SELECT name, detail FROM consistency_entries
-                              WHERE deleted = 0
-                              ORDER BY id
-                              LIMIT @limit OFFSET @offset
-                          """;
+
+        if (tag != null)
+        {
+            cmd.CommandText = """
+                                  SELECT name, detail, tag FROM consistency_entries
+                                  WHERE deleted = 0 AND tag = @tag
+                                  ORDER BY id
+                                  LIMIT @limit OFFSET @offset
+                              """;
+            cmd.Parameters.AddWithValue("@tag", tag);
+        }
+        else
+        {
+            cmd.CommandText = """
+                                  SELECT name, detail, tag FROM consistency_entries
+                                  WHERE deleted = 0
+                                  ORDER BY id
+                                  LIMIT @limit OFFSET @offset
+                              """;
+        }
+
         cmd.Parameters.AddWithValue("@limit", limit);
         cmd.Parameters.AddWithValue("@offset", offset);
         await using var reader = await cmd.ExecuteReaderAsync();
         while (await reader.ReadAsync())
-            items.Add(new { name = reader.GetString(0), detail = reader.GetString(1) });
+            items.Add(new { name = reader.GetString(0), detail = reader.GetString(1), tag = reader.GetString(2) });
 
         var total = 0;
         await using var countCmd = conn.CreateCommand();
-        countCmd.CommandText = "SELECT COUNT(*) FROM consistency_entries WHERE deleted = 0";
+        if (tag != null)
+        {
+            countCmd.CommandText = "SELECT COUNT(*) FROM consistency_entries WHERE deleted = 0 AND tag = @tag";
+            countCmd.Parameters.AddWithValue("@tag", tag);
+        }
+        else
+        {
+            countCmd.CommandText = "SELECT COUNT(*) FROM consistency_entries WHERE deleted = 0";
+        }
         var countResult = await countCmd.ExecuteScalarAsync();
         if (countResult != null)
             total = Convert.ToInt32(countResult);

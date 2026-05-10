@@ -6,7 +6,8 @@ public record ConsistencyOperation
     {
         Append,
         Remove,
-        Edit
+        Edit,
+        EditTag
     }
 
     private ConsistencyOperation()
@@ -16,14 +17,16 @@ public record ConsistencyOperation
     public OperationType Type { get; init; }
     public string? Name { get; init; }
     public string? Detail { get; init; }
+    public string Tag { get; init; } = "null";
 
-    public static ConsistencyOperation Append(string name, string detail)
+    public static ConsistencyOperation Append(string name, string detail, string tag)
     {
         return new ConsistencyOperation
         {
             Type = OperationType.Append,
             Name = name,
-            Detail = detail
+            Detail = detail,
+            Tag = tag
         };
     }
 
@@ -43,6 +46,16 @@ public record ConsistencyOperation
             Type = OperationType.Edit,
             Name = name,
             Detail = detail
+        };
+    }
+
+    public static ConsistencyOperation EditTag(string name, string tag)
+    {
+        return new ConsistencyOperation
+        {
+            Type = OperationType.EditTag,
+            Name = name,
+            Tag = tag
         };
     }
 }

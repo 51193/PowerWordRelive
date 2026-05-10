@@ -6,6 +6,9 @@ public class ConsistencyParser : CommandParser<ConsistencyOperation>
 {
     private const string ConsistencyPrefix = "consistency|";
 
+    private static readonly HashSet<string> ValidTags = new()
+        { "world", "character", "item", "event", "null" };
+
     protected override string Prefix => ConsistencyPrefix;
 
     protected override ConsistencyOperation? ParseLine(string line)
@@ -23,17 +26,19 @@ public class ConsistencyParser : CommandParser<ConsistencyOperation>
             "append" => ParseAppend(parts),
             "remove" => ParseRemove(parts),
             "edit" => ParseEdit(parts),
+            "edit_tag" => ParseEditTag(parts),
             _ => null
         };
     }
 
     private ConsistencyOperation? ParseAppend(string[] parts)
     {
-        if (parts.Length < 3)
+        if (parts.Length < 4)
             return null;
 
         var name = parts[1].Trim();
-        var detail = string.Join("|", parts.Skip(2)).Trim();
+        var detail = string.Join("|", parts.Skip(2).Take(parts.Length - 3)).Trim();
+        var tag = parts[^1].Trim();
 
         if (string.IsNullOrEmpty(name))
         {
@@ -49,7 +54,14 @@ public class ConsistencyParser : CommandParser<ConsistencyOperation>
             return null;
         }
 
-        return ConsistencyOperation.Append(name, detail);
+        if (!ValidTags.Contains(tag))
+        {
+            LogRedirector.Warn("PowerWordRelive.LLMRequester",
+                $"Consistency append has invalid tag: '{tag}'");
+            return null;
+        }
+
+        return ConsistencyOperation.Append(name, detail, tag);
     }
 
     private ConsistencyOperation? ParseRemove(string[] parts)
@@ -91,5 +103,30 @@ public class ConsistencyParser : CommandParser<ConsistencyOperation>
         }
 
         return ConsistencyOperation.Edit(name, detail);
+    }
+
+    private ConsistencyOperation? ParseEditTag(string[] parts)
+    {
+        if (parts.Length < 3)
+            return null;
+
+        var name = parts[1].Trim();
+        var tag = parts[^1].Trim();
+
+        if (string.IsNullOrEmpty(name))
+        {
+            LogRedirector.Warn("PowerWordRelive.LLMRequester",
+                "Consistency edit_tag has empty name");
+            return null;
+        }
+
+        if (!ValidTags.Contains(tag))
+        {
+            LogRedirector.Warn("PowerWordRelive.LLMRequester",
+                $"Consistency edit_tag has invalid tag: '{tag}'");
+            return null;
+        }
+
+        return ConsistencyOperation.EditTag(name, tag);
     }
 }

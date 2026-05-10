@@ -33,8 +33,8 @@ public class ConsistencyAccessor
             var entries = _db.GetActiveConsistencyEntries(_consistencyLimit);
 
             var sb = new StringBuilder();
-            foreach (var (_, name, detail) in entries)
-                sb.AppendLine($"{name}：{detail}");
+            foreach (var (_, name, detail, tag) in entries)
+                sb.AppendLine($"[{tag}] {name}：{detail}");
 
             return sb.ToString().TrimEnd();
         }

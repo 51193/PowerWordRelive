@@ -154,7 +154,7 @@ internal class ConsistencyRequest : IRequest
                     return;
                 }
 
-                _db.InsertConsistencyEntry(op.Name!, op.Detail!);
+                _db.InsertConsistencyEntry(op.Name!, op.Detail!, op.Tag);
                 break;
             }
 
@@ -172,7 +172,16 @@ internal class ConsistencyRequest : IRequest
                 var id = ResolveActiveConsistencyId(op.Name!);
                 if (id == null)
                     return;
-                _db.UpdateConsistencyEntry(id.Value, op.Name!, op.Detail!);
+                _db.UpdateConsistencyEntry(id.Value, op.Name!, op.Detail!, op.Tag);
+                break;
+            }
+
+            case ConsistencyOperation.OperationType.EditTag:
+            {
+                var id = ResolveActiveConsistencyId(op.Name!);
+                if (id == null)
+                    return;
+                _db.UpdateConsistencyEntryTag(id.Value, op.Tag);
                 break;
             }
         }
@@ -242,9 +251,10 @@ internal class ConsistencyRequest : IRequest
             ? "  (EMPTY)"
             : string.Join('\n', operations.Select(o => o.Type switch
             {
-                ConsistencyOperation.OperationType.Append => $"  append: {o.Name} | {o.Detail}",
+                ConsistencyOperation.OperationType.Append => $"  append: {o.Name} | {o.Detail} | {o.Tag}",
                 ConsistencyOperation.OperationType.Remove => $"  remove: {o.Name}",
                 ConsistencyOperation.OperationType.Edit => $"  edit: {o.Name} | {o.Detail}",
+                ConsistencyOperation.OperationType.EditTag => $"  edit_tag: {o.Name} | {o.Tag}",
                 _ => "  ?"
             }));
 

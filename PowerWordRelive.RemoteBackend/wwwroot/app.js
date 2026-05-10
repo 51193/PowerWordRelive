@@ -20,6 +20,12 @@ const conPrev = document.getElementById('con-prev');
 const conNext = document.getElementById('con-next');
 const conPageInfo = document.getElementById('con-page-info');
 const conPagination = document.getElementById('con-pagination');
+const kwContainer = document.getElementById('kw-container');
+const kwList = document.getElementById('kw-list');
+const kwPrev = document.getElementById('kw-prev');
+const kwNext = document.getElementById('kw-next');
+const kwPageInfo = document.getElementById('kw-page-info');
+const kwPagination = document.getElementById('kw-pagination');
 
 let ws = null;
 let msgId = 0;
@@ -42,6 +48,9 @@ let taskOffset = 0;
 let taskTotal = 0;
 let conOffset = 0;
 let conTotal = 0;
+let kwTag = 'world';
+let kwOffset = 0;
+let kwTotal = 0;
 
 function connect() {
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -298,14 +307,18 @@ function switchPanelTab(tab) {
     document.querySelectorAll('#panel-tabs .tab').forEach(t => {
         if (t.textContent.includes('故事进展') && tab === 'story_progress') t.classList.add('active');
         if (t.textContent.includes('任务') && tab === 'task') t.classList.add('active');
+        if (t.textContent.includes('关键字笔记') && tab === 'keyword_notes') t.classList.add('active');
         if (t.textContent.includes('一致性表格') && tab === 'consistency') t.classList.add('active');
     });
 
     spList.style.display = tab === 'story_progress' ? '' : 'none';
     spPagination.style.display = (tab === 'story_progress' && spTotal > 0) ? 'flex' : 'none';
     taskContainer.style.display = tab === 'task' ? '' : 'none';
+    kwContainer.style.display = tab === 'keyword_notes' ? '' : 'none';
     conList.style.display = tab === 'consistency' ? '' : 'none';
     conPagination.style.display = (tab === 'consistency' && conTotal > 0) ? 'flex' : 'none';
+
+    if (tab === 'keyword_notes' && kwTotal === 0) loadKeywordNotes(kwTag, 0);
 }
 
 function switchTaskTab(status) {
@@ -368,16 +381,38 @@ function changeTaskPage(direction) {
     loadTasks(taskStatus, newOffset);
 }
 
-async function loadConsistency(offset) {
-    const batch = await queryAsync('list_consistency', {limit: PAGE_SIZE, offset});
+async function loadConsistency(offset, tag) {
+    const params = {limit: PAGE_SIZE, offset};
+    if (tag) params.tag = tag;
+    const batch = await queryAsync('list_consistency', params);
     if (!batch || batch.type === 'error') {
         conList.innerHTML = '<div class="chat-placeholder">加载失败</div>';
         return;
     }
 
+    const items = batch.data || [];
+
+    if (tag) {
+        kwOffset = offset;
+        kwTotal = batch.total || 0;
+        kwList.innerHTML = '';
+        if (items.length === 0) {
+            kwList.innerHTML = '<div class="chat-placeholder">暂无条目</div>';
+            kwPagination.style.display = 'none';
+        } else {
+            renderConsistencyItems(kwList, items);
+            const totalPages = Math.ceil(kwTotal / PAGE_SIZE) || 1;
+            const currentPage = Math.floor(kwOffset / PAGE_SIZE) + 1;
+            kwPageInfo.textContent = `第 ${currentPage}/${totalPages} 页`;
+            kwPrev.disabled = kwOffset <= 0;
+            kwNext.disabled = kwOffset + PAGE_SIZE >= kwTotal;
+            kwPagination.style.display = 'flex';
+        }
+        return;
+    }
+
     conOffset = offset;
     conTotal = batch.total || 0;
-    const items = batch.data || [];
 
     conList.innerHTML = '';
     if (items.length === 0) {
@@ -386,22 +421,7 @@ async function loadConsistency(offset) {
         return;
     }
 
-    for (const item of items) {
-        const entry = document.createElement('div');
-        entry.className = 'con-entry';
-
-        const name = document.createElement('div');
-        name.className = 'con-name';
-        name.textContent = item.name || '';
-
-        const detail = document.createElement('div');
-        detail.className = 'con-detail';
-        detail.textContent = item.detail || '';
-
-        entry.appendChild(name);
-        entry.appendChild(detail);
-        conList.appendChild(entry);
-    }
+    renderConsistencyItems(conList, items);
 
     const totalPages = Math.ceil(conTotal / PAGE_SIZE) || 1;
     const currentPage = Math.floor(conOffset / PAGE_SIZE) + 1;
@@ -409,6 +429,57 @@ async function loadConsistency(offset) {
     conPrev.disabled = conOffset <= 0;
     conNext.disabled = conOffset + PAGE_SIZE >= conTotal;
     conPagination.style.display = 'flex';
+}
+
+function renderConsistencyItems(container, items) {
+    const tagLabels = {world: '世界观', character: '人物', item: '物品', event: '事件', null: '内部追踪'};
+    for (const item of items) {
+        const entry = document.createElement('div');
+        entry.className = 'con-entry';
+
+        const nameRow = document.createElement('div');
+        nameRow.className = 'con-name-row';
+
+        const name = document.createElement('span');
+        name.className = 'con-name';
+        name.textContent = item.name || '';
+
+        const tag = item.tag || 'null';
+        const tagBadge = document.createElement('span');
+        tagBadge.className = 'con-tag';
+        tagBadge.textContent = tagLabels[tag] || tag;
+
+        nameRow.appendChild(name);
+        nameRow.appendChild(tagBadge);
+
+        const detail = document.createElement('div');
+        detail.className = 'con-detail';
+        detail.textContent = item.detail || '';
+
+        entry.appendChild(nameRow);
+        entry.appendChild(detail);
+        container.appendChild(entry);
+    }
+}
+
+async function loadKeywordNotes(tag, offset) {
+    await loadConsistency(offset, tag);
+}
+
+function switchKwTag(tag) {
+    kwTag = tag;
+    document.querySelectorAll('#kw-sub-tabs .sub-tab').forEach(t => t.classList.remove('active'));
+    const labels = {world: '世界观', character: '人物', item: '物品', event: '事件'};
+    document.querySelectorAll('#kw-sub-tabs .sub-tab').forEach(t => {
+        if (t.textContent === labels[tag]) t.classList.add('active');
+    });
+    loadKeywordNotes(tag, 0);
+}
+
+function changeKwPage(direction) {
+    const newOffset = kwOffset + direction * PAGE_SIZE;
+    if (newOffset < 0 || newOffset >= kwTotal) return;
+    loadKeywordNotes(kwTag, newOffset);
 }
 
 function changeConPage(direction) {

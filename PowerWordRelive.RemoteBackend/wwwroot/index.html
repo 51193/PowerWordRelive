@@ -34,7 +34,8 @@
             <div class="tabs" id="panel-tabs">
                 <button class="tab active" onclick="switchPanelTab('story_progress')">故事进展</button>
                 <button class="tab" onclick="switchPanelTab('task')">任务</button>
-                <button class="tab" onclick="switchPanelTab('consistency')">一致性表格（测试）</button>
+                <button class="tab" onclick="switchPanelTab('keyword_notes')">关键字笔记</button>
+                <button class="tab" onclick="switchPanelTab('consistency')">一致性表格</button>
             </div>
             <div class="sp-list" id="sp-list">
                 <div class="chat-placeholder">连接后端以加载内容</div>
@@ -59,6 +60,22 @@
                 <button disabled id="sp-prev" onclick="changeSpPage(-1)">上一页</button>
                 <span id="sp-page-info"></span>
                 <button disabled id="sp-next" onclick="changeSpPage(1)">下一页</button>
+            </div>
+            <div class="kw-container" id="kw-container" style="display:none">
+                <div class="sub-tabs" id="kw-sub-tabs">
+                    <button class="sub-tab active" onclick="switchKwTag('world')">世界观</button>
+                    <button class="sub-tab" onclick="switchKwTag('character')">人物</button>
+                    <button class="sub-tab" onclick="switchKwTag('item')">物品</button>
+                    <button class="sub-tab" onclick="switchKwTag('event')">事件</button>
+                </div>
+                <div class="kw-list" id="kw-list">
+                    <div class="chat-placeholder">连接后端以加载内容</div>
+                </div>
+                <div class="pagination" id="kw-pagination" style="display:none">
+                    <button disabled id="kw-prev" onclick="changeKwPage(-1)">上一页</button>
+                    <span id="kw-page-info"></span>
+                    <button disabled id="kw-next" onclick="changeKwPage(1)">下一页</button>
+                </div>
             </div>
             <div class="consistency-list" id="con-list" style="display:none">
                 <div class="chat-placeholder">连接后端以加载内容</div>
