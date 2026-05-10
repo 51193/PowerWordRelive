@@ -19,11 +19,13 @@
     </PropertyGroup>
 
     <Target Name="CopyConfig" AfterTargets="Build" Condition="!$(MSBuildProjectName.EndsWith('Tests'))">
-        <!-- Release: always use config.example to avoid leaking secrets -->
+        <!-- Always copy config.example for reference -->
+        <Copy SourceFiles="$(RepoRoot)config.example"
+              DestinationFolder="$(CommonOutputDir)"/>
+        <!-- Active config: Release uses config.example, Debug uses real config if available -->
         <Copy SourceFiles="$(RepoRoot)config.example"
               DestinationFiles="$(CommonOutputDir)config"
               Condition="'$(Configuration)' == 'Release'"/>
-        <!-- Debug: use real config if available, otherwise fall back to config.example -->
         <Copy SourceFiles="$(RepoRoot)config"
               DestinationFolder="$(CommonOutputDir)"
               Condition="'$(Configuration)' != 'Release' And Exists('$(RepoRoot)config')"/>

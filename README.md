@@ -21,7 +21,7 @@
 |------|-------|---------|--------|
 | 操作系统 | Ubuntu / Debian 等 | Windows 10/11 | 是 |
 | .NET 10 运行环境 | [下载 .NET 10 Runtime](https://dotnet.microsoft.com/zh-cn/download/dotnet/10.0) | [下载 .NET 10 Runtime](https://dotnet.microsoft.com/zh-cn/download/dotnet/10.0) | 是 |
-| Python 3.13+ | 系统一般自带 | [python.org](https://www.python.org/downloads/) 安装 | 是 |
+| Python 3.10+ | 系统一般自带 | [python.org](https://www.python.org/downloads/) 安装 | 是 |
 | ffmpeg | `apt install ffmpeg` | [ffmpeg.org](https://ffmpeg.org/download.html) 下载并加入 PATH | 是 |
 | DeepSeek API Token | 去 [platform.deepseek.com](https://platform.deepseek.com) 注册充值 | 同左 | 是 |
 | HuggingFace Token | 去 [huggingface.co](https://huggingface.co/settings/tokens) 注册（免费）**+ 接受模型使用协议** | 同左 | 是 |
@@ -34,34 +34,18 @@
 
 去 [Releases 页面](../../releases) 下载对应平台的压缩包：
 
-- **Linux**：`pwr-main-xxx-linux-x64.tar.gz`
-- **Windows**：`pwr-main-xxx-win-x64.tar.gz`
+- **Linux**：`pwr-local-*-linux-x64.tar.gz`
+- **Windows**：`pwr-local-*-win-x64.tar.gz`
 
 ```bash
 # Linux
-tar -xzf pwr-main-*-linux-x64.tar.gz
+tar -xzf pwr-local-*-linux-x64.tar.gz
 
 # Windows（PowerShell）
-tar -xzf pwr-main-*-win-x64.tar.gz
+tar -xzf pwr-local-*-win-x64.tar.gz
 ```
 
-### 第二步：初始化
-
-**Linux：**
-```bash
-bash setup.sh
-```
-
-**Windows（PowerShell）：**
-```powershell
-.\setup.ps1
-```
-
-> 如果卡住了：模型下载可能需要几分钟到十几分钟，取决于网速。出现"初始化完成"就说明好了。
->
-> Windows 上如果遇到执行策略限制，先运行：`Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
-
-### 第三步：配置
+### 第二步：配置
 
 解压后的目录里有个 `config` 文件，用文本编辑器打开它。**你只需要改这几行：**
 
@@ -92,9 +76,23 @@ modelscope.token: ms_xxxxxxxxxxxxxxxx
 > 4. 去 https://huggingface.co/settings/tokens 创建一个 Access Token（类型选"Read"）
 > 5. 把生成的 Token 填到上面 `huggingface.token` 那一行
 
-其他所有配置项保持默认即可，不需要动。
+解压目录下的 `config.example` 是完整配置模板，可用作文档参考。其他所有配置项保持默认即可，不需要动。
 
-> 也可以参考 `config.example` 查看所有可配置项的说明。
+### 第三步：初始化
+
+**Linux：**
+```bash
+bash setup.sh
+```
+
+**Windows（PowerShell）：**
+```powershell
+.\setup.ps1
+```
+
+> 初始化会创建 Python 虚拟环境并下载 AI 模型（VAD ~50MB、说话人分离 ~600MB、语音转录 ~1GB）。模型下载可能需要几分钟到十几分钟，取决于网速。出现"初始化完成"就说明好了。
+>
+> Windows 上如果遇到执行策略限制，先运行：`Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
 
 ### 第四步：运行
 
@@ -223,15 +221,24 @@ modelscope.token: （可选）在此填入你的ModelScope访问令牌
 
 ### 1. 在服务器上下载 RemoteBackend 包
 
-去 [Releases 页面](../../releases) 下载对应平台的 `pwr-remote-xxx-*.tar.gz`。
+去 [Releases 页面](../../releases) 下载对应平台的 `pwr-server-*-*.tar.gz`。
 
 ```bash
 # Linux
-tar -xzf pwr-remote-*-linux-x64.tar.gz
+tar -xzf pwr-server-*-linux-x64.tar.gz
 
 # Windows
-tar -xzf pwr-remote-*-win-x64.tar.gz
+tar -xzf pwr-server-*-win-x64.tar.gz
 ```
+
+解压后编辑 `config` 文件，配置以下内容：
+
+```
+remote_mode.server.port: 9500
+remote_mode.server.key_path: /etc/pwr/remote_backend.key
+```
+
+> Windows 服务器上改为 `C:\ProgramData\pwr\remote_backend.key`。
 
 ### 2. 生成密钥
 
@@ -268,18 +275,9 @@ echo "刚才复制的密钥" > keys/local_backend.key
 Set-Content -Path keys\local_backend.key -Value "刚才复制的密钥"
 ```
 
-### 4. 配置并启动服务端
+### 4. 启动服务端
 
-在服务器上解压后的目录中，编辑 `config` 文件：
-
-```
-remote_backend.port: 9500
-remote_backend.key_path: /etc/pwr/remote_backend.key
-```
-
-> Windows 服务器上改为 `C:\ProgramData\pwr\remote_backend.key`。
-
-启动：
+解压后的目录中直接启动：
 
 ```bash
 dotnet PowerWordRelive.RemoteBackend/PowerWordRelive.RemoteBackend.dll
@@ -314,7 +312,7 @@ A: 99% 是因为 HuggingFace Token 没配好，或者没有接受模型使用协
 A: 可以在 `config` 中把 `llm_request.refinement.model` 从 `deepseek-v4-flash` 改成 `deepseek-v4-pro`（更贵但更好）。
 
 ### Q: 提示"Python not found"
-A: 确保系统装了 Python 3.13+。
+A: 确保系统装了 Python 3.10+。
 - Linux：`apt install python3 python3-venv`
 - Windows：从 [python.org](https://www.python.org/downloads/) 安装，钩选"Add Python to PATH"
 
@@ -385,7 +383,7 @@ dotnet test
 bash scripts/package.sh linux-x64
 # Windows (Git Bash / WSL)
 bash scripts/package.sh win-x64
-# 产物在 out/pkg/ 下
+# 产物在 release/ 下
 ```
 
 ### 内部架构
