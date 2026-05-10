@@ -178,13 +178,13 @@ def run_server():
         t_start = time.time()
 
         try:
-            known_count = len(known)
-            if known_count == 0 or known_count == 1:
-                min_spk, max_spk = 1, 2
-            else:
-                min_spk = known_count
-                max_spk = known_count + 2
-            output = pipeline(input_path, min_speakers=min_spk, max_speakers=max_spk)
+            prev_stdout = sys.stdout
+            sys.stdout = open(os.devnull, "w")
+            try:
+                output = pipeline(input_path, min_speakers=1, max_speakers=3)
+            finally:
+                sys.stdout.close()
+                sys.stdout = prev_stdout
         except Exception as e:
             resp = {"error": str(e)}
             print(json.dumps(resp, ensure_ascii=False), flush=True)

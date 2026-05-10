@@ -10,6 +10,10 @@ internal class SpeakerSplitProcess
     private const string ProcessingExtension = ".processing";
     private readonly CumulativeTimer _cumulativeTimer = new();
     private readonly SpeakerSplitOptions _opt;
+    private Process? _pythonProc;
+    private StreamWriter? _pythonStdin;
+    private StreamReader? _pythonStdout;
+    private bool _protocolCorrupted;
 
     public SpeakerSplitProcess(SpeakerSplitOptions options)
     {
@@ -20,28 +24,29 @@ internal class SpeakerSplitProcess
     {
         _cumulativeTimer.Start();
 
-        Process? pythonProc = null;
-        StreamWriter? pythonStdin = null;
-        StreamReader? pythonStdout = null;
-
         try
         {
-            pythonProc = LaunchPython();
-            pythonStdin = pythonProc.StandardInput;
-            pythonStdout = pythonProc.StandardOutput;
-
-            _ = ReadStderrAsync(pythonProc.StandardError);
+            EnsurePythonRunning();
 
             while (!ct.IsCancellationRequested)
             {
                 try
                 {
-                    await ProcessPendingFilesAsync(pythonStdin, pythonStdout, ct);
+                    await ProcessPendingFilesAsync(ct);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     LogRedirector.Error("PowerWordRelive.SpeakerSplit",
                         "Error processing files", new { error = ex.Message });
+                }
+
+                if (_protocolCorrupted)
+                {
+                    LogRedirector.Warn("PowerWordRelive.SpeakerSplit",
+                        "Protocol corruption detected, restarting Python server");
+                    _protocolCorrupted = false;
+                    EnsurePythonRunning();
+                    continue;
                 }
 
                 try
@@ -55,20 +60,26 @@ internal class SpeakerSplitProcess
         }
         finally
         {
-            TeardownPython(pythonProc, pythonStdin);
+            TeardownPython();
             LogSummary();
         }
     }
 
-    private void TeardownPython(Process? proc, StreamWriter? stdin)
+    private void TeardownPython()
     {
         try
         {
-            stdin?.Close();
+            _pythonStdin?.Close();
         }
         catch
         {
         }
+
+        _pythonStdin = null;
+
+        var proc = _pythonProc;
+        _pythonProc = null;
+        _pythonStdout = null;
 
         if (proc is null)
             return;
@@ -121,6 +132,17 @@ internal class SpeakerSplitProcess
         proc.Dispose();
     }
 
+    private void EnsurePythonRunning()
+    {
+        TeardownPython();
+        _pythonProc = LaunchPython();
+        _pythonStdin = _pythonProc.StandardInput;
+        _pythonStdout = _pythonProc.StandardOutput;
+        _ = ReadStderrAsync(_pythonProc.StandardError);
+        LogRedirector.Info("PowerWordRelive.SpeakerSplit",
+            "Python diarization server started", new { pid = _pythonProc.Id });
+    }
+
     private void LogSummary()
     {
         var s = _cumulativeTimer.Snapshot();
@@ -171,8 +193,7 @@ internal class SpeakerSplitProcess
         return Process.Start(psi)!;
     }
 
-    private async Task ProcessPendingFilesAsync(
-        StreamWriter stdin, StreamReader stdout, CancellationToken ct)
+    private async Task ProcessPendingFilesAsync(CancellationToken ct)
     {
         var files = _opt.Fs.GetFiles(_opt.InputDir, "*.wav")
             .Where(f => !f.EndsWith(ProcessingExtension))
@@ -181,14 +202,13 @@ internal class SpeakerSplitProcess
 
         foreach (var file in files)
         {
-            if (ct.IsCancellationRequested)
+            if (ct.IsCancellationRequested || _protocolCorrupted)
                 break;
-            await ProcessFileAsync(file, stdin, stdout, ct);
+            await ProcessFileAsync(file, ct);
         }
     }
 
-    private async Task ProcessFileAsync(
-        string wavPath, StreamWriter stdin, StreamReader stdout, CancellationToken ct)
+    private async Task ProcessFileAsync(string wavPath, CancellationToken ct)
     {
         var fileName = Path.GetFileName(wavPath);
 
@@ -210,10 +230,10 @@ internal class SpeakerSplitProcess
                 match_threshold = _opt.MatchThreshold
             });
 
-            await stdin.WriteLineAsync(request.AsMemory(), CancellationToken.None);
-            await stdin.FlushAsync(CancellationToken.None);
+            await _pythonStdin!.WriteLineAsync(request.AsMemory(), CancellationToken.None);
+            await _pythonStdin!.FlushAsync(CancellationToken.None);
 
-            var response = await ReadLineAsync(stdout, ct);
+            var response = await ReadLineAsync(_pythonStdout!, ct);
             if (string.IsNullOrEmpty(response))
                 throw new Exception("Python server closed stdout unexpectedly");
 
@@ -228,6 +248,15 @@ internal class SpeakerSplitProcess
                 LogProgress(fileName, segsElement, root);
 
             _opt.Fs.TryCompleteProcessing(processingPath);
+        }
+        catch (JsonException)
+        {
+            LogRedirector.Error("PowerWordRelive.SpeakerSplit",
+                "Protocol corruption on Python stdout, releasing file for retry",
+                new { file = fileName });
+
+            _opt.Fs.TryReleaseProcessing(processingPath, wavPath);
+            _protocolCorrupted = true;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
