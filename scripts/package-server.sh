@@ -11,15 +11,24 @@ VERSION=$(git -C "$ROOT" describe --tags --always --dirty 2>/dev/null || echo "d
 
 echo "=== Packaging Server Release ($VERSION, $RID) ==="
 
-tar -czf "$RELEASE_DIR/pwr-server-${VERSION}-${RID}.tar.gz" \
-    --exclude='*_venv' \
-    --exclude='cache' \
-    -C "$OUT_DIR" \
-    PowerWordRelive.RemoteBackend \
-    PowerWordRelive.Infrastructure \
-    generate_key.sh \
-    generate_key.ps1 \
-    config \
-    config.example
+if [[ "$RID" == win-* ]]; then
+    tar -czf "$RELEASE_DIR/pwr-server-${VERSION}-${RID}.tar.gz" \
+        --exclude='*_venv' \
+        --exclude='cache' \
+        -C "$OUT_DIR" \
+        PowerWordRelive.RemoteBackend \
+        PowerWordRelive.Infrastructure \
+        generate_key.ps1 \
+        config
+else
+    tar -czf "$RELEASE_DIR/pwr-server-${VERSION}-${RID}.tar.gz" \
+        --exclude='*_venv' \
+        --exclude='cache' \
+        -C "$OUT_DIR" \
+        PowerWordRelive.RemoteBackend \
+        PowerWordRelive.Infrastructure \
+        generate_key.sh \
+        config
+fi
 
 echo "[server] pwr-server-${VERSION}-${RID}.tar.gz"

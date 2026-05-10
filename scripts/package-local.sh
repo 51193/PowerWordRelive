@@ -11,27 +11,46 @@ VERSION=$(git -C "$ROOT" describe --tags --always --dirty 2>/dev/null || echo "d
 
 echo "=== Packaging Local Release ($VERSION, $RID) ==="
 
-tar -czf "$RELEASE_DIR/pwr-local-${VERSION}-${RID}.tar.gz" \
-    --exclude='*_venv' \
-    --exclude='cache' \
-    --exclude='*.processing' \
-    -C "$OUT_DIR" \
-    PowerWordRelive.CLI \
-    PowerWordRelive.Host \
-    PowerWordRelive.Infrastructure \
-    PowerWordRelive.AudioCapture \
-    PowerWordRelive.SpeakerSplit \
-    PowerWordRelive.Transcribe \
-    PowerWordRelive.TranscriptionStore \
-    PowerWordRelive.LLMRequester \
-    PowerWordRelive.LocalBackend \
-    PowerWordRelive.RemoteBackend \
-    text_data \
-    setup.sh \
-    setup.ps1 \
-    generate_key.sh \
-    generate_key.ps1 \
-    config \
-    config.example
+if [[ "$RID" == win-* ]]; then
+    tar -czf "$RELEASE_DIR/pwr-local-${VERSION}-${RID}.tar.gz" \
+        --exclude='*_venv' \
+        --exclude='cache' \
+        --exclude='*.processing' \
+        -C "$OUT_DIR" \
+        PowerWordRelive.CLI \
+        PowerWordRelive.Host \
+        PowerWordRelive.Infrastructure \
+        PowerWordRelive.AudioCapture \
+        PowerWordRelive.SpeakerSplit \
+        PowerWordRelive.Transcribe \
+        PowerWordRelive.TranscriptionStore \
+        PowerWordRelive.LLMRequester \
+        PowerWordRelive.LocalBackend \
+        PowerWordRelive.RemoteBackend \
+        text_data \
+        setup.ps1 \
+        generate_key.ps1 \
+        config
+else
+    tar -czf "$RELEASE_DIR/pwr-local-${VERSION}-${RID}.tar.gz" \
+        --exclude='*_venv' \
+        --exclude='cache' \
+        --exclude='*.processing' \
+        -C "$OUT_DIR" \
+        PowerWordRelive.CLI \
+        PowerWordRelive.Host \
+        PowerWordRelive.Infrastructure \
+        PowerWordRelive.AudioCapture \
+        PowerWordRelive.SpeakerSplit \
+        PowerWordRelive.Transcribe \
+        PowerWordRelive.TranscriptionStore \
+        PowerWordRelive.LLMRequester \
+        PowerWordRelive.LocalBackend \
+        PowerWordRelive.RemoteBackend \
+        text_data \
+        setup.sh \
+        generate_key.sh \
+        config
+fi
 
 echo "[local] pwr-local-${VERSION}-${RID}.tar.gz"

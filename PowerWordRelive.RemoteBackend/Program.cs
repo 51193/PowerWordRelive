@@ -7,12 +7,14 @@ using PowerWordRelive.RemoteBackend.Services;
 
 byte[] keyBytes;
 string[] urls;
+bool isStandalone;
 
-if (Console.IsInputRedirected)
+var stdinConfig = Console.IsInputRedirected ? ChildConfigReader.TryReadConfig() : null;
+
+if (stdinConfig != null)
 {
-    var config = ChildConfigReader.ReadConfig();
-    var localMode = config.GetValueOrDefault("local_mode", new Dictionary<string, string>());
-    var remoteMode = config.GetValueOrDefault("remote_mode", new Dictionary<string, string>());
+    var localMode = stdinConfig.GetValueOrDefault("local_mode", new Dictionary<string, string>());
+    var remoteMode = stdinConfig.GetValueOrDefault("remote_mode", new Dictionary<string, string>());
 
     var port = localMode.GetValueOrDefault("port", "");
     var keyBase64 = remoteMode.GetValueOrDefault("local.key", "");
@@ -31,6 +33,7 @@ if (Console.IsInputRedirected)
 
     keyBytes = AesAuth.ParseKey(keyBase64);
     urls = new[] { $"http://127.0.0.1:{port}" };
+    isStandalone = false;
 
     LogRedirector.Info("RemoteBackend", $"Starting in local mode on 127.0.0.1:{port}");
 }
@@ -77,6 +80,7 @@ else
     var keyBase64 = fs.ReadAllText(keyPath).Trim();
     keyBytes = AesAuth.ParseKey(keyBase64);
     urls = new[] { $"http://0.0.0.0:{port}" };
+    isStandalone = true;
 
     Console.WriteLine($"Starting RemoteBackend standalone on 0.0.0.0:{port}");
 }
@@ -87,18 +91,18 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
     Args = new[] { "--urls", string.Join(";", urls) }
 });
 
-if (Console.IsInputRedirected)
-{
-    var logAdapter = new LogRedirectorLogAdapter();
-    builder.Services.AddSingleton(_ => new BackendConnectionManager(keyBytes, logAdapter));
-}
-else
+if (isStandalone)
 {
     builder.Services.AddSingleton(sp =>
     {
         var logger = sp.GetRequiredService<ILogger<BackendConnectionManager>>();
         return new BackendConnectionManager(keyBytes, new AspNetLogAdapter(logger));
     });
+}
+else
+{
+    var logAdapter = new LogRedirectorLogAdapter();
+    builder.Services.AddSingleton(_ => new BackendConnectionManager(keyBytes, logAdapter));
 }
 
 builder.Services.Configure<HostOptions>(options => { options.ShutdownTimeout = TimeSpan.FromSeconds(2); });

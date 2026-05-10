@@ -76,7 +76,7 @@ modelscope.token: ms_xxxxxxxxxxxxxxxx
 > 4. 去 https://huggingface.co/settings/tokens 创建一个 Access Token（类型选"Read"）
 > 5. 把生成的 Token 填到上面 `huggingface.token` 那一行
 
-解压目录下的 `config.example` 是完整配置模板，可用作文档参考。其他所有配置项保持默认即可，不需要动。
+其他所有配置项保持默认即可，不需要动。
 
 ### 第三步：初始化
 
@@ -298,7 +298,44 @@ local_backend.key_path: ./keys/local_backend.key
 
 ### 6. 保持服务端长期运行（可选）
 
-可以用 `systemd` 或 `screen` 让服务端在后台一直运行。
+**方法一：systemd（推荐）**
+
+创建 `/etc/systemd/system/pwr-remote.service`：
+
+```ini
+[Unit]
+Description=PowerWordRelive RemoteBackend
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/pwr/PowerWordRelive.RemoteBackend
+ExecStart=/usr/bin/dotnet /home/pwr/PowerWordRelive.RemoteBackend/PowerWordRelive.RemoteBackend.dll
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pwr-remote
+
+[Install]
+WantedBy=multi-user.target
+```
+
+然后：
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now pwr-remote
+sudo journalctl -fu pwr-remote   # 查看日志
+```
+
+**方法二：screen**
+
+```bash
+screen -S pwr
+dotnet PowerWordRelive.RemoteBackend/PowerWordRelive.RemoteBackend.dll
+# Ctrl+A, D 分离
+```
 
 ## 常见问题
 
