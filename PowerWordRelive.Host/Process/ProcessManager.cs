@@ -24,8 +24,7 @@ internal class ProcessManager
     public async Task LaunchAllAsync()
     {
         var definitions = GetProcessDefinitions();
-        definitions = RemoveManagedDefinitions(definitions);
-        AddLocalWebProcesses(definitions);
+        InjectLocalWebConfig(definitions);
 
         if (definitions.Count == 0)
         {
@@ -35,7 +34,7 @@ internal class ProcessManager
 
         foreach (var def in definitions)
         {
-            var subConfig = BuildSubConfig(def.Domains);
+            var subConfig = BuildSubConfig(def.Domains, def.InjectedConfig);
             var dllPath = ProcessResolver.ResolveDllPath(def.ProjectName);
 
             if (!_fs.FileExists(dllPath))
@@ -58,98 +57,70 @@ internal class ProcessManager
         }
     }
 
-    private static List<ProcessDefinition> RemoveManagedDefinitions(List<ProcessDefinition> definitions)
-    {
-        return definitions.Where(d => d.Name != "local_backend_remote").ToList();
-    }
-
-    private void AddLocalWebProcesses(List<ProcessDefinition> definitions)
-    {
-        var (localPort, localKeyBase64) = ReadLocalModeConfig();
-        if (!localPort.HasValue)
-            return;
-
-        definitions.RemoveAll(d => d.Name == "local_backend");
-
-        definitions.Add(new ProcessDefinition(
-            "remote_backend", "PowerWordRelive.RemoteBackend",
-            Array.Empty<string>(),
-            $"--mode local --port {localPort.Value} --key {localKeyBase64}"));
-
-        definitions.Add(new ProcessDefinition(
-            "local_backend_local", "PowerWordRelive.LocalBackend",
-            new[] { "storage", "general" },
-            $"--mode local --port {localPort.Value} --key {localKeyBase64}"));
-
-        TryAddRemoteBackend(definitions);
-    }
-
-    private (int? port, string? keyBase64) ReadLocalModeConfig()
+    private void InjectLocalWebConfig(List<ProcessDefinition> definitions)
     {
         if (!_config.TryGetValue("local_mode", out var localMode))
-        {
-            LogRedirector.Error("PowerWordRelive.Host",
-                "local_mode.local_port not configured, skipping local web suite");
-            return (null, null);
-        }
+            return;
 
-        if (!localMode.TryGetValue("local_port", out var portStr) ||
-            !int.TryParse(portStr, out var port))
+        if (!localMode.TryGetValue("enabled", out var enabledStr) || enabledStr != "true")
+            return;
+
+        if (!localMode.TryGetValue("port", out var portStr) || !int.TryParse(portStr, out var port))
         {
             LogRedirector.Error("PowerWordRelive.Host",
-                "local_mode.local_port is missing or invalid, skipping local web suite");
-            return (null, null);
+                "local_mode.port is missing or invalid, skipping local web suite");
+            return;
         }
 
         var keyBytes = new byte[32];
         RandomNumberGenerator.Fill(keyBytes);
         var keyBase64 = Convert.ToBase64String(keyBytes);
 
-        return (port, keyBase64);
-    }
+        LogRedirector.Info("PowerWordRelive.Host", "Local web mode enabled",
+            new { port, keyLength = keyBytes.Length });
 
-    private void TryAddRemoteBackend(List<ProcessDefinition> definitions)
-    {
-        if (!_config.TryGetValue("local_backend", out var lbConfig))
-            return;
-
-        if (!lbConfig.TryGetValue("remote_enabled", out var remoteEnabled) || remoteEnabled != "true")
-            return;
-
-        var remoteHost = lbConfig.GetValueOrDefault("remote_host", "");
-        var remotePortStr = lbConfig.GetValueOrDefault("remote_port", "");
-        var keyPath = lbConfig.GetValueOrDefault("key_path", "");
-
-        if (string.IsNullOrEmpty(remoteHost) ||
-            string.IsNullOrEmpty(remotePortStr) ||
-            !int.TryParse(remotePortStr, out var remotePort) ||
-            string.IsNullOrEmpty(keyPath))
+        var remoteDef = definitions.Find(d => d.Name == "remote_backend");
+        if (remoteDef != null)
         {
-            LogRedirector.Error("PowerWordRelive.Host",
-                "local_backend.remote_enabled is true but remote_host/remote_port/key_path is missing or invalid");
-            return;
+            var remoteDomains = remoteDef.Domains.ToList();
+            if (!remoteDomains.Contains("remote_mode"))
+                remoteDomains.Add("remote_mode");
+            remoteDef = remoteDef with
+            {
+                Domains = remoteDomains.ToArray(),
+                InjectedConfig = new Dictionary<string, Dictionary<string, string>>
+                {
+                    ["remote_mode"] = new()
+                    {
+                        ["local.enabled"] = "true",
+                        ["local.port"] = portStr,
+                        ["local.key"] = keyBase64
+                    }
+                }
+            };
+            definitions[definitions.IndexOf(definitions.Find(d => d.Name == "remote_backend")!)] = remoteDef;
         }
 
-        if (!_fs.FileExists(keyPath))
+        var localDef = definitions.Find(d => d.Name == "local_backend");
+        if (localDef != null)
         {
-            LogRedirector.Error("PowerWordRelive.Host",
-                $"Key file not found for remote backend: {keyPath}");
-            return;
-        }
-
-        try
-        {
-            var remoteKeyBase64 = _fs.ReadAllText(keyPath).Trim();
-
-            definitions.Add(new ProcessDefinition(
-                "local_backend_remote", "PowerWordRelive.LocalBackend",
-                new[] { "local_backend", "storage", "general" },
-                $"--mode remote --host {remoteHost} --port {remotePort} --key {remoteKeyBase64}"));
-        }
-        catch (Exception ex)
-        {
-            LogRedirector.Error("PowerWordRelive.Host",
-                $"Failed to read key file for remote backend: {ex.Message}");
+            var localDomains = localDef.Domains.ToList();
+            if (!localDomains.Contains("remote_mode"))
+                localDomains.Add("remote_mode");
+            localDef = localDef with
+            {
+                Domains = localDomains.ToArray(),
+                InjectedConfig = new Dictionary<string, Dictionary<string, string>>
+                {
+                    ["remote_mode"] = new()
+                    {
+                        ["local.enabled"] = "true",
+                        ["local.port"] = portStr,
+                        ["local.key"] = keyBase64
+                    }
+                }
+            };
+            definitions[definitions.IndexOf(definitions.Find(d => d.Name == "local_backend")!)] = localDef;
         }
     }
 
@@ -160,7 +131,6 @@ internal class ProcessManager
             try
             {
                 await spawned.SystemProcess.WaitForExitAsync(ct);
-
                 var exitCode = spawned.SystemProcess.ExitCode;
                 LogRedirector.Info("PowerWordRelive.Host",
                     $"Child process {spawned.ProcessName} exited with code {exitCode}",
@@ -177,7 +147,6 @@ internal class ProcessManager
         });
 
         await Task.WhenAll(exitTasks);
-
         await Task.WhenAll(_spawned.Select(s => s.StdoutTask));
         await Task.WhenAll(_spawned.Select(s => s.StderrTask));
 
@@ -259,13 +228,24 @@ internal class ProcessManager
         return definitions;
     }
 
-    private Dictionary<string, Dictionary<string, string>> BuildSubConfig(string[] domains)
+    private Dictionary<string, Dictionary<string, string>> BuildSubConfig(string[] domains,
+        Dictionary<string, Dictionary<string, string>>? injected)
     {
         var subConfig = new Dictionary<string, Dictionary<string, string>>();
 
         foreach (var domain in domains)
+        {
             if (_config.TryGetValue(domain, out var entries))
                 subConfig[domain] = new Dictionary<string, string>(entries);
+
+            if (injected != null && injected.TryGetValue(domain, out var injectedEntries))
+            {
+                if (!subConfig.ContainsKey(domain))
+                    subConfig[domain] = new Dictionary<string, string>();
+                foreach (var (k, v) in injectedEntries)
+                    subConfig[domain][k] = v;
+            }
+        }
 
         return subConfig;
     }

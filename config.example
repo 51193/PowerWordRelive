@@ -8,7 +8,7 @@ processes.transcribe: PowerWordRelive.Transcribe
 processes.transcription_store: PowerWordRelive.TranscriptionStore
 processes.llm_requester: PowerWordRelive.LLMRequester
 processes.local_backend: PowerWordRelive.LocalBackend
-processes.local_backend_remote: PowerWordRelive.LocalBackend
+processes.remote_backend: PowerWordRelive.RemoteBackend
 
 # 传递给各进程的配置域
 process_config.audio_capture.domains: audio_capture,general
@@ -16,14 +16,35 @@ process_config.speaker_split.domains: speaker_split,general,huggingface
 process_config.transcribe.domains: transcribe,general,modelscope
 process_config.transcription_store.domains: transcription_store,storage,general
 process_config.llm_requester.domains: llm_request,llm,general,storage,text_data
-process_config.local_backend.domains: local_backend,storage,general
-process_config.local_backend_remote.domains: local_backend,storage,general
+process_config.local_backend.domains: local_mode,remote_mode,local_backend,storage,general
+process_config.remote_backend.domains: local_mode,remote_mode,general
 
 # 通用配置 — work_root 必须是绝对路径
 general.work_root: /absolute/path/to/work/root
 
-# 本地Web模式
-local_mode.local_port: 9501
+# === 本地 Web 面板模式 ===
+# Host 读取此配置决定是否启动本地 Web 面板
+local_mode.enabled: true
+local_mode.port: 9501
+
+# === 本地后端轮询配置 ===
+local_backend.poll_interval_sec: 3
+local_backend.max_reconnect_attempts: 5
+local_backend.initial_reconnect_delay_sec: 2
+
+# === 远程模式配置 ===
+# remote_mode.local.* — LocalBackend 连接本机 RemoteBackend 的配置
+#   Host 在本地模式下注入 local.enabled、local.port、local.key
+# remote_mode.remote.* — LocalBackend 连接远端服务器的配置
+remote_mode.remote.enabled: false
+remote_mode.remote.host: your.remote.server.com
+remote_mode.remote.port: 9501
+remote_mode.remote.key_path: ./keys/remote_key.bin
+
+# remote_mode.server.* — 服务器端独立部署 RemoteBackend 时使用的配置
+# 注意：以下配置仅在服务器上单独部署 RemoteBackend 时使用，本机部署时无效
+remote_mode.server.port: 9501
+remote_mode.server.key_path: /etc/pwr/remote_key.bin
 
 # 音频捕获
 audio_capture.output_dir: ./segments
@@ -32,7 +53,6 @@ audio_capture.silence_timeout_ms: 800
 audio_capture.max_segment_sec: 120
 audio_capture.no_speech_timeout_sec: 30
 audio_capture.min_speech_ms: 500
-# Windows: DirectShow 音频设备名（Linux 下忽略，自动使用 PulseAudio）
 audio_capture.windows_audio_device: VB-Audio Virtual Cable
 
 # 说话人分离
@@ -61,11 +81,11 @@ transcription_store.poll_interval_sec: 1
 llm.token: 在此填入你的LLM API Token
 llm.api_url: https://api.deepseek.com/v1/chat/completions
 
-# 定时器（格式：llm_request.timer.<秒数>: <逗号分隔的请求键列表>）
+# 定时器
 llm_request.timer.45: speaker_identification, refinement
 llm_request.timer.90: story_progress, task, consistency
 
-# 窗口限制（兜底上限，独立于具体请求）
+# 窗口限制
 llm_request.window_limits.active_task: 30
 llm_request.window_limits.consistency: 50
 
@@ -110,20 +130,8 @@ storage.sqlite_path: ./data/pwr.db
 # 文本资料
 text_data.base_dir: text_data/
 
-# 本地后端（连接远端后端，仅 remote_enabled=true 时生效）
-local_backend.remote_enabled: false
-local_backend.remote_host: your.remote.server.com
-local_backend.remote_port: 9500
-local_backend.key_path: /etc/pwr/local_backend.key
-local_backend.max_reconnect_attempts: 5
-local_backend.initial_reconnect_delay_sec: 2
-
-# 远端后端（独立运行，不在 Host 管理下）
-remote_backend.port: 9500
-remote_backend.key_path: /etc/pwr/remote_backend.key
-
 # HuggingFace 令牌
 huggingface.token: 在此填入你的HuggingFace Token
 
-# ModelScope 令牌（可选，但强烈推荐）
+# ModelScope 令牌
 modelscope.token: （可选）在此填入你的ModelScope访问令牌

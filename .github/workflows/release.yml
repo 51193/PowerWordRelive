@@ -31,7 +31,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: pwr-${{ matrix.rid }}
-          path: out/pkg/*.tar.gz
+          path: release/*.tar.gz
 
   release:
     needs: build

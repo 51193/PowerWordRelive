@@ -37,9 +37,14 @@
         <Copy SourceFiles="$(RepoRoot)scripts/setup.ps1" DestinationFolder="$(CommonOutputDir)"/>
     </Target>
 
-    <Target Name="CopyGenerateKey" AfterTargets="Build" Condition="!$(MSBuildProjectName.EndsWith('Tests'))">
+    <Target Name="CopyKeyGenScripts" AfterTargets="Build" Condition="!$(MSBuildProjectName.EndsWith('Tests'))">
         <Copy SourceFiles="$(RepoRoot)scripts/generate_key.sh" DestinationFolder="$(CommonOutputDir)"/>
         <Copy SourceFiles="$(RepoRoot)scripts/generate_key.ps1" DestinationFolder="$(CommonOutputDir)"/>
+    </Target>
+
+    <Target Name="CopyPackageScripts" AfterTargets="Build" Condition="!$(MSBuildProjectName.EndsWith('Tests'))">
+        <Copy SourceFiles="$(RepoRoot)scripts/package-local.sh" DestinationFolder="$(CommonOutputDir)"/>
+        <Copy SourceFiles="$(RepoRoot)scripts/package-server.sh" DestinationFolder="$(CommonOutputDir)"/>
     </Target>
 
     <Target Name="CopyPrompts" AfterTargets="Build" Condition="!$(MSBuildProjectName.EndsWith('Tests'))">

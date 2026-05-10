@@ -1,10 +1,10 @@
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using PowerWordRelive.Infrastructure.Logging;
 using PowerWordRelive.Infrastructure.Messages;
+using PowerWordRelive.Infrastructure.Security;
 
 namespace PowerWordRelive.RemoteBackend.Services;
 
@@ -15,6 +15,7 @@ public class BackendConnectionManager
     private readonly byte[] _key;
     private readonly ILogAdapter _log;
     private WebSocket? _backendSocket;
+    private string? _lastDataUpdateJson;
 
     public BackendConnectionManager(byte[] key, ILogAdapter log)
     {
@@ -38,11 +39,10 @@ public class BackendConnectionManager
     public async Task HandleBackendWebSocket(HttpContext context)
     {
         var ws = await context.WebSockets.AcceptWebSocketAsync();
-        var buffer = new byte[8192];
 
         try
         {
-            var authenticated = await AuthenticateBackend(ws, buffer);
+            var authenticated = await AuthenticateBackend(ws);
             if (!authenticated)
             {
                 _log.Warn("Backend auth failed");
@@ -64,7 +64,7 @@ public class BackendConnectionManager
 
             _log.Info("Backend connected");
             await BroadcastStatusToFrontends(true);
-            await RelayLoop(ws, buffer);
+            await RelayLoop(ws);
         }
         finally
         {
@@ -90,8 +90,16 @@ public class BackendConnectionManager
         try
         {
             await SendStatusToFrontend(ws);
-            var buffer = new byte[8192];
-            await FrontendReceiveLoop(ws, buffer, clientId);
+
+            var cached = _lastDataUpdateJson;
+            if (cached != null)
+            {
+                var bytes = Encoding.UTF8.GetBytes(cached);
+                await ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true,
+                    CancellationToken.None);
+            }
+
+            await FrontendReceiveLoop(ws, clientId);
         }
         catch (WebSocketException)
         {
@@ -103,47 +111,42 @@ public class BackendConnectionManager
         }
     }
 
-    private async Task<bool> AuthenticateBackend(WebSocket ws, byte[] buffer)
+    private async Task<bool> AuthenticateBackend(WebSocket ws)
     {
-        var nonce = Convert.ToBase64String(RandomNumberGenerator.GetBytes(16));
-        var challenge = new WsMessage { Type = "auth_challenge", Message = nonce };
-        await SendJson(ws, challenge);
+        var challenge = AesAuth.GenerateChallenge();
+        var msg = new WsMessage { Type = "auth_challenge", Message = challenge };
+        await SendJson(ws, msg);
 
-        var result = await ReceiveJson(ws, buffer, TimeSpan.FromSeconds(5));
-        if (result is not { Type: "auth_response" } || result.Message == null)
+        var response = await ReceiveJson(ws, TimeSpan.FromSeconds(5));
+        if (response is not { Type: "auth_response" } || response.Message == null)
             return false;
 
-        return VerifyAuth(nonce, result.Message);
+        return AesAuth.VerifyChallenge(challenge, response.Message, _key);
     }
 
-    private bool VerifyAuth(string nonce, string encryptedResponse)
+    private async Task RelayLoop(WebSocket backend)
     {
-        try
+        while (backend.State == WebSocketState.Open)
         {
-            var data = Convert.FromBase64String(encryptedResponse);
-            var iv = data[..16];
-            var ciphertext = data[16..];
+            var msg = await ReceiveJson(backend, TimeSpan.FromDays(1));
+            if (msg == null) break;
 
-            using var aes = Aes.Create();
-            aes.Key = _key;
-            aes.IV = iv;
-            using var decryptor = aes.CreateDecryptor();
-            var plainBytes = decryptor.TransformFinalBlock(ciphertext, 0, ciphertext.Length);
-            var decrypted = Encoding.UTF8.GetString(plainBytes);
-            return decrypted == nonce;
-        }
-        catch
-        {
-            return false;
+            var json = JsonSerializer.Serialize(msg);
+            if (msg.Type == "data_update")
+                _lastDataUpdateJson = json;
+
+            await BroadcastRaw(json);
         }
     }
 
-    private async Task FrontendReceiveLoop(WebSocket ws, byte[] buffer, string clientId)
+    private async Task FrontendReceiveLoop(WebSocket ws, string clientId)
     {
         while (ws.State == WebSocketState.Open)
         {
-            var msg = await ReceiveJson(ws, buffer, TimeSpan.FromDays(1));
+            var msg = await ReceiveJson(ws, TimeSpan.FromDays(1));
             if (msg == null) break;
+
+            if (msg.Type != "query") continue;
 
             WebSocket? backend;
             lock (_gate)
@@ -153,44 +156,33 @@ public class BackendConnectionManager
 
             if (backend == null)
             {
-                var error = new WsMessage
-                {
-                    Type = "error",
-                    Id = msg.Id,
-                    Message = "backend offline"
-                };
+                var error = new WsMessage { Type = "error", Id = msg.Id, Message = "backend offline" };
                 await SendJson(ws, error);
-                continue;
             }
-
-            if (msg.Type == "query")
+            else
+            {
                 await SendJson(backend, msg);
+            }
         }
     }
 
-    private async Task RelayLoop(WebSocket backend, byte[] buffer)
+    private async Task BroadcastRaw(string json)
     {
-        while (backend.State == WebSocketState.Open)
-        {
-            var msg = await ReceiveJson(backend, buffer, TimeSpan.FromDays(1));
-            if (msg == null) break;
-
-            await BroadcastToFrontends(msg);
-        }
-    }
-
-    private async Task BroadcastToFrontends(WsMessage msg)
-    {
+        var bytes = Encoding.UTF8.GetBytes(json);
         var dead = new List<string>();
+
         foreach (var (id, ws) in _frontendClients)
+        {
             try
             {
-                await SendJson(ws, msg);
+                await ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true,
+                    CancellationToken.None);
             }
             catch
             {
                 dead.Add(id);
             }
+        }
 
         foreach (var id in dead)
             _frontendClients.TryRemove(id, out _);
@@ -199,13 +191,13 @@ public class BackendConnectionManager
     private async Task BroadcastStatusToFrontends(bool connected)
     {
         var msg = new WsMessage { Type = "status", BackendConnected = connected };
-        await BroadcastToFrontends(msg);
+        var json = JsonSerializer.Serialize(msg);
+        await BroadcastRaw(json);
     }
 
     private async Task SendStatusToFrontend(WebSocket ws)
     {
-        var connected = IsConnected;
-        var msg = new WsMessage { Type = "status", BackendConnected = connected };
+        var msg = new WsMessage { Type = "status", BackendConnected = IsConnected };
         await SendJson(ws, msg);
     }
 
@@ -216,11 +208,12 @@ public class BackendConnectionManager
         await ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
     }
 
-    private static async Task<WsMessage?> ReceiveJson(WebSocket ws, byte[] buffer, TimeSpan timeout)
+    private static async Task<WsMessage?> ReceiveJson(WebSocket ws, TimeSpan timeout)
     {
         using var cts = new CancellationTokenSource(timeout);
         try
         {
+            var buffer = new byte[8192];
             var result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), cts.Token);
             if (result.MessageType == WebSocketMessageType.Close)
                 return null;

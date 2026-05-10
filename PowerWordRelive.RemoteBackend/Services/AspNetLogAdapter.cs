@@ -4,7 +4,7 @@ namespace PowerWordRelive.RemoteBackend.Services;
 
 public class AspNetLogAdapter : ILogAdapter
 {
-    private readonly ILogger<BackendConnectionManager> _logger;
+    private readonly ILogger _logger;
 
     public AspNetLogAdapter(ILogger<BackendConnectionManager> logger)
     {
