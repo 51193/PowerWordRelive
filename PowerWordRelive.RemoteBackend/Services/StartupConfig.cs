@@ -39,7 +39,7 @@ internal record StartupConfig(
 
         return new StartupConfig(
             key,
-            args,
+            ["--urls", $"http://0.0.0.0:{config.Port}"],
             AppContext.BaseDirectory,
             (services, k) => services.AddSingleton(sp =>
                 new BackendConnectionManager(k, new AspNetLogAdapter(
