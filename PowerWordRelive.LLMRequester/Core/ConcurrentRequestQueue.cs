@@ -5,7 +5,6 @@ namespace PowerWordRelive.LLMRequester.Core;
 
 public class ConcurrentRequestQueue
 {
-    private const int DuplicateWarnThreshold = 3;
     private static readonly TimeSpan StuckWarnThreshold = TimeSpan.FromMinutes(5);
     private readonly ConcurrentDictionary<string, int> _duplicates = new();
 
@@ -16,13 +15,17 @@ public class ConcurrentRequestQueue
 
     public void Enqueue(string key)
     {
+        if (_duplicates.TryGetValue(key, out var count) && count > 0)
+        {
+            LogRedirector.Warn("PowerWordRelive.LLMRequester",
+                $"Skipping duplicate enqueue for key '{key}', already in queue");
+            return;
+        }
+
         var wasEmpty = _queue.IsEmpty;
         _queue.Enqueue(key);
 
         _duplicates.AddOrUpdate(key, 1, (_, c) => c + 1);
-        if (_duplicates.TryGetValue(key, out var count) && count >= DuplicateWarnThreshold)
-            LogRedirector.Warn("PowerWordRelive.LLMRequester",
-                $"Queue has {count} duplicate entries for key '{key}', request design may be overloaded");
 
         lock (_stuckLock)
         {
