@@ -38,12 +38,12 @@ local_backend.initial_reconnect_delay_sec: 2
 # remote_mode.remote.* — LocalBackend 连接远端服务器的配置
 remote_mode.remote.enabled: false
 remote_mode.remote.host: your.remote.server.com
-remote_mode.remote.port: 9501
+remote_mode.remote.port: 9500
 remote_mode.remote.key_path: ./keys/remote_key.bin
 
 # remote_mode.server.* — 服务器端独立部署 RemoteBackend 时使用的配置
 # 注意：以下配置仅在服务器上单独部署 RemoteBackend 时使用，本机部署时无效
-remote_mode.server.port: 9501
+remote_mode.server.port: 9500
 remote_mode.server.key_path: /etc/pwr/remote_key.bin
 
 # 音频捕获

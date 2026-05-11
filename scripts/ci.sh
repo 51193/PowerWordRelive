@@ -15,7 +15,7 @@ dotnet build $BUILD_ARGS
 
 echo ""
 echo "=== CI: Test ==="
-dotnet test
+dotnet test -c Release
 
 echo ""
 echo "=== CI ($RID): Package ==="
