@@ -7,7 +7,6 @@ namespace PowerWordRelive.LLMRequester.Database;
 public class LLMDatabase : IDisposable
 {
     private const string UnassignedValue = "__UNASSIGNED__";
-    private const string UnknownValue = "__UNKNOWN__";
 
     private readonly SqliteConnection _connection;
 
@@ -95,13 +94,35 @@ public class LLMDatabase : IDisposable
         return map;
     }
 
-    public void UpdateSpeakerRole(string speakerId, string roleName)
+    public bool TryUpdateSpeakerRole(string speakerId, string newRole, out string? currentRole)
     {
-        using var cmd = _connection.CreateCommand();
-        cmd.CommandText = "UPDATE speaker_mappings SET role_name = @role WHERE speaker_id = @speaker";
-        cmd.Parameters.AddWithValue("@role", roleName);
-        cmd.Parameters.AddWithValue("@speaker", speakerId);
-        cmd.ExecuteNonQuery();
+        using var txn = _connection.BeginTransaction();
+
+        using var updateCmd = _connection.CreateCommand();
+        updateCmd.CommandText = @"
+            UPDATE speaker_mappings
+            SET role_name = @new
+            WHERE speaker_id = @speaker AND role_name = @unassigned";
+        updateCmd.Parameters.AddWithValue("@new", newRole);
+        updateCmd.Parameters.AddWithValue("@speaker", speakerId);
+        updateCmd.Parameters.AddWithValue("@unassigned", UnassignedValue);
+        var rows = updateCmd.ExecuteNonQuery();
+
+        if (rows > 0)
+        {
+            txn.Commit();
+            currentRole = null;
+            return true;
+        }
+
+        using var readCmd = _connection.CreateCommand();
+        readCmd.CommandText = "SELECT role_name FROM speaker_mappings WHERE speaker_id = @speaker";
+        readCmd.Parameters.AddWithValue("@speaker", speakerId);
+        var result = readCmd.ExecuteScalar();
+        currentRole = result as string;
+
+        txn.Commit();
+        return false;
     }
 
     public bool TryEnsureRefinementTable()

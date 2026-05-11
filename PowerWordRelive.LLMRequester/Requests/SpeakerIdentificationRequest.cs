@@ -93,9 +93,15 @@ internal class SpeakerIdentificationRequest : IRequest
                     continue;
                 }
 
-                _db.UpdateSpeakerRole(spk.SpeakerId, name);
-                LogRedirector.Info("PowerWordRelive.LLMRequester",
-                    $"Speaker '{spk.SpeakerId}' identified as: {name}");
+                if (_db.TryUpdateSpeakerRole(spk.SpeakerId, name, out var currentRole))
+                    LogRedirector.Info("PowerWordRelive.LLMRequester",
+                        $"Speaker '{spk.SpeakerId}' identified as: {name}");
+                else if (currentRole == name)
+                    LogRedirector.Info("PowerWordRelive.LLMRequester",
+                        $"Speaker '{spk.SpeakerId}' already identified as: {name}");
+                else
+                    LogRedirector.Warn("PowerWordRelive.LLMRequester",
+                        $"Speaker '{spk.SpeakerId}' conflict: LLM returned '{name}' but DB already has '{currentRole}'");
             }
             catch (Exception ex)
             {
