@@ -5,7 +5,7 @@ internal static class AudioCaptureDeviceFactory
     public static IAudioCaptureDevice Create()
     {
 #if WINDOWS
-        return new DirectShowCaptureDevice();
+        return new WindowsLoopbackCapture();
 #elif LINUX
         return new PulseAudioCaptureDevice();
 #else

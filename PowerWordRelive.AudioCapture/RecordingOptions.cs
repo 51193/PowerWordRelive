@@ -11,8 +11,6 @@ internal record RecordingOptions(
     IFileSystem Fs,
     ISegmentHandler SegmentHandler,
     IPlatformServices Platform,
-    IAudioCaptureDevice Device,
-    string? WindowsAudioDevice = null,
     int SilenceTimeoutMs = 800,
     int MaxSegmentSec = 120,
     int NoSpeechTimeoutSec = 30,

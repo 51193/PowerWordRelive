@@ -11,6 +11,10 @@
         <ProjectReference Include="..\PowerWordRelive.Infrastructure\PowerWordRelive.Infrastructure.csproj"/>
     </ItemGroup>
 
+    <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+        <PackageReference Include="NAudio" Version="2.3.0"/>
+    </ItemGroup>
+
     <Target Name="CopyPythonScript" AfterTargets="Build">
         <Copy SourceFiles="$(RepoRoot)scripts/vad_segmenter.py" DestinationFolder="$(OutputPath)"/>
     </Target>

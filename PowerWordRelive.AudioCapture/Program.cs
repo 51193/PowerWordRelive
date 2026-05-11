@@ -5,7 +5,6 @@ using PowerWordRelive.Infrastructure.Platform;
 using PowerWordRelive.Infrastructure.Storage;
 
 var platform = PlatformServicesFactory.Create();
-var device = AudioCaptureDeviceFactory.Create();
 var fs = new LocalFileSystem();
 
 var config = ChildConfigReader.ReadConfig();
@@ -14,12 +13,10 @@ var generalConfig = config.GetValueOrDefault("general", new Dictionary<string, s
 
 var workRoot = generalConfig.GetValueOrDefault("work_root", "");
 var outputDir = audioConfig.GetValueOrDefault("output_dir", "./segments");
-int.TryParse(audioConfig.GetValueOrDefault("sample_rate", "16000"), out var sampleRate);
 int.TryParse(audioConfig.GetValueOrDefault("silence_timeout_ms", "300"), out var silenceMs);
 int.TryParse(audioConfig.GetValueOrDefault("max_segment_sec", "120"), out var maxSec);
 int.TryParse(audioConfig.GetValueOrDefault("no_speech_timeout_sec", "30"), out var noSpeechTimeoutSec);
 int.TryParse(audioConfig.GetValueOrDefault("min_speech_ms", "500"), out var minSpeechMs);
-audioConfig.TryGetValue("windows_audio_device", out var windowsAudioDevice);
 
 if (!string.IsNullOrEmpty(workRoot) && Path.IsPathRooted(workRoot))
     outputDir = Path.GetFullPath(Path.Combine(workRoot, outputDir));
@@ -50,7 +47,7 @@ if (!fs.FileExists(pythonScriptPath))
 var handler = new LocalFileSegmentHandler(fs);
 var options = new RecordingOptions(
     outputDir, pythonScriptPath, pythonPath, cacheRoot, fs, handler,
-    platform, device, windowsAudioDevice,
+    platform,
     silenceMs, maxSec, noSpeechTimeoutSec, minSpeechMs);
 var process = new RecordingProcess(options);
 

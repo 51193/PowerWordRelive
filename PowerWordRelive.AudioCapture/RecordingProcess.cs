@@ -5,15 +5,11 @@ namespace PowerWordRelive.AudioCapture;
 
 internal class RecordingProcess
 {
-    private readonly FfmpegWrapper _ffmpeg;
     private readonly RecordingOptions _opt;
 
     public RecordingProcess(RecordingOptions options)
     {
         _opt = options;
-        _ffmpeg = new FfmpegWrapper(
-            _opt.PythonPath, _opt.CacheRoot, _opt.Fs,
-            _opt.Device, _opt.WindowsAudioDevice);
     }
 
     public async Task RunAsync(CancellationToken ct)
@@ -21,19 +17,29 @@ internal class RecordingProcess
         LogRedirector.Info("PowerWordRelive.AudioCapture", "Recording process started",
             new
             {
-                monitor = _ffmpeg.Monitor, outputDir = _opt.OutputDir,
+                outputDir = _opt.OutputDir,
                 silenceTimeoutMs = _opt.SilenceTimeoutMs,
                 maxSegmentSec = _opt.MaxSegmentSec,
                 noSpeechTimeoutSec = _opt.NoSpeechTimeoutSec,
                 minSpeechMs = _opt.MinSpeechMs
             });
 
-        var (ffmpegProcess, pythonProcess) = _ffmpeg.Launch(
-            _opt.PythonScriptPath, _opt.OutputDir,
-            _opt.SilenceTimeoutMs, _opt.MaxSegmentSec,
-            _opt.NoSpeechTimeoutSec, _opt.MinSpeechMs);
+        using var captureDevice = AudioCaptureDeviceFactory.Create();
+        var pythonProcess = StartVadProcess();
 
-        var stderrTask = ReadStderrAsync(ffmpegProcess, pythonProcess, ct);
+        try
+        {
+            await captureDevice.StartAsync(pythonProcess.StandardInput.BaseStream, ct);
+        }
+        catch (Exception ex)
+        {
+            LogRedirector.Error("PowerWordRelive.AudioCapture",
+                "Failed to start audio capture", new { error = ex.Message });
+            pythonProcess.Kill(true);
+            return;
+        }
+
+        var stderrTask = ReadStderrAsync("python3", pythonProcess.StandardError, ct);
 
         try
         {
@@ -66,7 +72,8 @@ internal class RecordingProcess
         }
         finally
         {
-            TeardownFfmpeg(ffmpegProcess);
+            captureDevice.Dispose();
+            pythonProcess.StandardInput.Close();
             await TeardownPython(pythonProcess, ct);
             await stderrTask;
             LogRedirector.Info("PowerWordRelive.AudioCapture", "Child processes reclaimed");
@@ -75,47 +82,48 @@ internal class RecordingProcess
         LogRedirector.Info("PowerWordRelive.AudioCapture", "Recording process stopped");
     }
 
-    private void TeardownFfmpeg(Process process)
+    private Process StartVadProcess()
     {
-        var pid = process.Id;
+        var pythonArgs = $"\"{_opt.PythonScriptPath}\" " +
+                         $"--output-dir \"{_opt.OutputDir}\" " +
+                         $"--silence-ms {_opt.SilenceTimeoutMs} " +
+                         $"--max-sec {_opt.MaxSegmentSec} " +
+                         $"--min-speech-ms {_opt.MinSpeechMs} " +
+                         $"--no-speech-timeout {_opt.NoSpeechTimeoutSec}";
+
+        var psi = new ProcessStartInfo
+        {
+            FileName = _opt.PythonPath,
+            Arguments = pythonArgs,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        var torchHome = Path.Combine(_opt.CacheRoot, "torch");
+        _opt.Fs.CreateDirectory(torchHome);
+        psi.Environment["TORCH_HOME"] = torchHome;
+
+        return Process.Start(psi)!;
+    }
+
+    private static async Task ReadStderrAsync(string source, StreamReader reader,
+        CancellationToken ct)
+    {
         try
         {
-            if (process.HasExited)
-            {
-                LogRedirector.Info("PowerWordRelive.AudioCapture",
-                    "ffmpeg already exited before teardown",
-                    new { pid, exitCode = process.ExitCode });
-                return;
-            }
-
-            LogRedirector.Info("PowerWordRelive.AudioCapture",
-                "Sending SIGINT to ffmpeg", new { pid });
-
-            _opt.Platform.SendInterruptSignal(process);
-
-            if (process.HasExited)
-            {
-                LogRedirector.Info("PowerWordRelive.AudioCapture",
-                    "ffmpeg exited after SIGINT", new { pid });
-                return;
-            }
-
-            LogRedirector.Warn("PowerWordRelive.AudioCapture",
-                "ffmpeg did not exit after SIGINT, force killing", new { pid });
-            process.Kill(true);
-            process.WaitForExit(1000);
-
-            if (process.HasExited)
-                LogRedirector.Info("PowerWordRelive.AudioCapture",
-                    "ffmpeg killed", new { pid });
-            else
-                LogRedirector.Warn("PowerWordRelive.AudioCapture",
-                    "ffmpeg still alive after kill", new { pid });
+            string? line;
+            while ((line = await ReadLineWithCancellationAsync(reader, ct)) != null)
+                if (!string.IsNullOrWhiteSpace(line))
+                    LogRedirector.Warn(source, line);
         }
-        catch (Exception ex)
+        catch (OperationCanceledException)
         {
-            LogRedirector.Error("PowerWordRelive.AudioCapture",
-                "Error tearing down ffmpeg", new { pid, error = ex.Message });
+        }
+        catch (ObjectDisposedException)
+        {
         }
     }
 
@@ -162,32 +170,6 @@ internal class RecordingProcess
             LogRedirector.Error("PowerWordRelive.AudioCapture",
                 "Error tearing down Python VAD", new { pid, error = ex.Message });
         }
-    }
-
-    private static async Task ReadStderrAsync(
-        Process ffmpeg, Process python,
-        CancellationToken ct)
-    {
-        async Task ReadStream(StreamReader reader, string source)
-        {
-            try
-            {
-                string? line;
-                while ((line = await ReadLineWithCancellationAsync(reader, ct)) != null)
-                    if (!string.IsNullOrWhiteSpace(line))
-                        LogRedirector.Warn(source, line);
-            }
-            catch (OperationCanceledException)
-            {
-            }
-            catch (ObjectDisposedException)
-            {
-            }
-        }
-
-        await Task.WhenAll(
-            ReadStream(ffmpeg.StandardError, "ffmpeg"),
-            ReadStream(python.StandardError, "python3"));
     }
 
     private static async Task<string?> ReadLineWithCancellationAsync(

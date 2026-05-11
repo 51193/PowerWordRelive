@@ -1,6 +1,6 @@
 namespace PowerWordRelive.AudioCapture;
 
-internal interface IAudioCaptureDevice
+internal interface IAudioCaptureDevice : IDisposable
 {
-    string BuildFfmpegInputArgs(string? configuredDevice);
+    Task StartAsync(Stream pcmOut, CancellationToken ct);
 }

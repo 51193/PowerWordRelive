@@ -48,12 +48,10 @@ remote_mode.server.key_path: /etc/pwr/remote_key.bin
 
 # 音频捕获
 audio_capture.output_dir: ./segments
-audio_capture.sample_rate: 16000
 audio_capture.silence_timeout_ms: 800
 audio_capture.max_segment_sec: 120
 audio_capture.no_speech_timeout_sec: 30
 audio_capture.min_speech_ms: 500
-audio_capture.windows_audio_device: VB-Audio Virtual Cable
 
 # 说话人分离
 speaker_split.input_dir: ./segments
@@ -61,7 +59,7 @@ speaker_split.output_dir: ./speaker_segments
 speaker_split.embeddings_dir: ./speaker_embeddings
 speaker_split.device: cpu
 speaker_split.poll_interval_sec: 1
-speaker_split.match_threshold: 0.55
+speaker_split.match_threshold: 0.65
 speaker_split.omp_num_threads: 8
 speaker_split.segmentation_batch_size: 64
 speaker_split.embedding_batch_size: 64
