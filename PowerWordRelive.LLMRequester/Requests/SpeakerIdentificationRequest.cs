@@ -83,7 +83,7 @@ internal class SpeakerIdentificationRequest : IRequest
                 var userPrompt = _assembler.Assemble(UserPromptFile, userVars);
 
                 var response = await _apiClient.SendAsync(_apiUrl, _token, _config,
-                    systemPrompt, userPrompt);
+                    systemPrompt, userPrompt, "speaker_identification");
 
                 var name = response.Content.Trim();
                 if (name == UnknownMarker || string.IsNullOrEmpty(name))

@@ -93,7 +93,7 @@ internal class ConsistencyRequest : IRequest
         try
         {
             response = await _apiClient.SendAsync(_apiUrl, _token, _config,
-                systemPrompt, userPrompt);
+                systemPrompt, userPrompt, "consistency");
         }
         catch (Exception ex)
         {

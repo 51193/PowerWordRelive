@@ -89,7 +89,7 @@ internal class StoryProgressRequest : IRequest
         try
         {
             response = await _apiClient.SendAsync(_apiUrl, _token, _config,
-                systemPrompt, userPrompt);
+                systemPrompt, userPrompt, "story_progress");
         }
         catch (Exception ex)
         {

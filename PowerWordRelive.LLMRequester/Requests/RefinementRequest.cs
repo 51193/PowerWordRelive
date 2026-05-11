@@ -90,7 +90,7 @@ internal class RefinementRequest : IRequest
         try
         {
             response = await _apiClient.SendAsync(_apiUrl, _token, _config,
-                systemPrompt, userPrompt);
+                systemPrompt, userPrompt, "refinement");
         }
         catch (Exception ex)
         {

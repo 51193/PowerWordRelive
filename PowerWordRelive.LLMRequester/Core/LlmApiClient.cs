@@ -4,6 +4,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using PowerWordRelive.Infrastructure.Logging;
+using PowerWordRelive.LLMRequester.Database;
 
 namespace PowerWordRelive.LLMRequester.Core;
 
@@ -21,12 +22,20 @@ public class LlmApiClient
     private static readonly object LogLock = new();
 #endif
 
+    private readonly LLMDatabase _db;
+
+    public LlmApiClient(LLMDatabase db)
+    {
+        _db = db;
+    }
+
     public async Task<LlmResponse> SendAsync(
         string apiUrl,
         string token,
         LlmRequestConfig config,
         string systemPrompt,
-        string userPrompt)
+        string userPrompt,
+        string requestKey)
     {
         var body = new
         {
@@ -106,6 +115,17 @@ public class LlmApiClient
                 missInputTokens,
                 cacheHitRate = cacheHitRate.ToString("P1")
             });
+
+        try
+        {
+            _db.TryEnsureTokenUsageTable();
+            _db.InsertTokenUsage(requestKey, outputTokens, cachedInputTokens, missInputTokens);
+        }
+        catch (Exception ex)
+        {
+            LogRedirector.Warn("PowerWordRelive.LLMRequester",
+                $"Failed to write token usage: {ex.Message}");
+        }
 
         return new LlmResponse(content, outputTokens, cachedInputTokens, missInputTokens);
     }

@@ -595,4 +595,43 @@ public class LLMDatabase : IDisposable
         var result = cmd.ExecuteScalar();
         return result is DBNull or null ? null : Convert.ToInt32(result);
     }
+
+    public bool TryEnsureTokenUsageTable()
+    {
+        try
+        {
+            using var cmd = _connection.CreateCommand();
+            cmd.CommandText = """
+                                  CREATE TABLE IF NOT EXISTS token_usage (
+                                      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                                      request_key         TEXT NOT NULL,
+                                      created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+                                      output_tokens       INTEGER NOT NULL DEFAULT 0,
+                                      cached_input_tokens INTEGER NOT NULL DEFAULT 0,
+                                      miss_input_tokens   INTEGER NOT NULL DEFAULT 0
+                                  );
+                              """;
+            cmd.ExecuteNonQuery();
+            return true;
+        }
+        catch (SqliteException ex)
+        {
+            LogRedirector.Info("PowerWordRelive.LLMRequester",
+                $"Token usage table not ready: {ex.Message}");
+            return false;
+        }
+    }
+
+    public void InsertTokenUsage(string requestKey, int outputTokens, int cachedInputTokens, int missInputTokens)
+    {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = @"
+            INSERT INTO token_usage (request_key, output_tokens, cached_input_tokens, miss_input_tokens)
+            VALUES (@key, @output, @cached, @miss)";
+        cmd.Parameters.AddWithValue("@key", requestKey);
+        cmd.Parameters.AddWithValue("@output", outputTokens);
+        cmd.Parameters.AddWithValue("@cached", cachedInputTokens);
+        cmd.Parameters.AddWithValue("@miss", missInputTokens);
+        cmd.ExecuteNonQuery();
+    }
 }

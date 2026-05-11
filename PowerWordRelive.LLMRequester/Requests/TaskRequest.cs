@@ -95,7 +95,7 @@ internal class TaskRequest : IRequest
         try
         {
             response = await _apiClient.SendAsync(_apiUrl, _token, _config,
-                systemPrompt, userPrompt);
+                systemPrompt, userPrompt, "task");
         }
         catch (Exception ex)
         {

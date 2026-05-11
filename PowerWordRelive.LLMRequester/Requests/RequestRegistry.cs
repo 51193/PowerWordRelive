@@ -15,7 +15,7 @@ public static class RequestRegistry
         TaskAccessor taskAccessor,
         ConsistencyAccessor consistencyAccessor)
     {
-        var apiClient = new LlmApiClient();
+        var apiClient = new LlmApiClient(db);
         var registry = new Dictionary<string, IRequest>();
 
         foreach (var (key, config) in requestConfigs)
